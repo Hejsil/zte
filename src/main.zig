@@ -258,7 +258,10 @@ fn handleInput(app: App, key: Key.Type) !?App {
             return null;
         },
         save_key => editor = try editor.save(),
-        undo_key => editor = try editor.undo(),
+        undo_key => {
+            editor = try editor.undo();
+            text = editor.current();
+        },
         copy_key => try editor.copyClipboard(),
         paste_key => {
             editor = try editor.pasteClipboard();
