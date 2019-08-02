@@ -195,7 +195,7 @@ const App = struct {
     view: @typeOf(window_view),
 };
 
-const help_key = Key.ctrl | 'h';
+const help_key = Key.ctrl | Key.alt | 'h';
 const quit_key = Key.ctrl | 'q';
 const save_key = Key.ctrl | 's';
 const undo_key = Key.ctrl | 'z';
@@ -239,6 +239,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
     var view = app.view;
     var text = editor.current();
 
+    debug.warn("{}\n", Key.toStr(key));
     switch (key) {
         reset_key => {
             text = text.removeAllButMainCursor();

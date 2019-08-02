@@ -106,21 +106,21 @@ pub fn readKey(stdin: fs.File) !Key.Type {
         len = try stdin.read(&buf);
     const key = buf[0..len];
 
-    //debug.warn("------------\n");
-    //for (key) |b| {
-    //    if (ascii.isPrint(b)) {
-    //        debug.warn("{} 0x{x:2} {b:8} '{c}'\n", b, b, b, b);
-    //    } else {
-    //        debug.warn("{} 0x{x:2} {b:8}\n", b, b, b);
-    //    }
-    //}
+    debug.warn("------------\n");
+    for (key) |b| {
+        if (ascii.isPrint(b)) {
+            debug.warn("{} 0x{x:2} {b:8} '{c}'\n", b, b, b, b);
+        } else {
+            debug.warn("{} 0x{x:2} {b:8}\n", b, b, b);
+        }
+    }
     switch (key.len) {
         1 => switch (key[0]) {
             '\x1b' => return Key.esc,
             '\x7f' => return Key.backspace,
             else => {
                 if (ascii.isPrint(key[0]))
-                    return Key.Type(key[0]);
+                    return key[0];
                 if (ascii.isPrint(key[0] | 0b01100000))
                     return Key.ctrl | (key[0] | 0b01100000);
 
@@ -131,10 +131,10 @@ pub fn readKey(stdin: fs.File) !Key.Type {
             if (key[0] != '\x1b')
                 return Key.unknown;
 
-            if (ascii.isPrint(key[0]))
-                return Key.alt | Key.Type(key[0]);
-            if (ascii.isPrint(key[0] | 0b01100000))
-                return Key.alt | Key.ctrl | (key[0] | 0b01100000);
+            if (ascii.isPrint(key[1]))
+                return Key.alt | key[1];
+            if (ascii.isPrint(key[1] | 0b01100000))
+                return Key.alt | Key.ctrl | (key[1] | 0b01100000);
         },
         3 => {
             if (key[0] != '\x1b')
