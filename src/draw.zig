@@ -734,8 +734,8 @@ pub const Terminal = struct {
         var new = term;
         new.top_left.x += pad.width;
         new.top_left.y += pad.height;
-        new.bot_right.x = new.top_left.x + view_range.min.width;
-        new.bot_right.y = new.top_left.y + view_range.min.height;
+        new.bot_right.x = math.min(term.top_left.x + term_size.width, new.top_left.x + view_range.min.width);
+        new.bot_right.y = math.min(term.top_left.y + term_size.height, new.top_left.y + view_range.min.height);
         new.draw(&view.child);
     }
 
@@ -823,6 +823,8 @@ pub const Terminal = struct {
         var new_term = term;
         new_term.top_left.x += 1;
         new_term.top_left.y += 1;
+        new_term.bot_right.x -= 1;
+        new_term.bot_right.y -= 1;
         new_term.draw(&view.child);
     }
 
@@ -930,10 +932,13 @@ pub const Terminal = struct {
     }
 
     fn size(term: Terminal) Size {
-        return Size{
+        const res = Size{
             .width = term.bot_right.x - term.top_left.x,
             .height = term.bot_right.y - term.top_left.y,
         };
+        debug.assert(res.width <= term.cell_size.width);
+        debug.assert(res.height <= term.cell_size.height);
+        return res;
     }
 
     fn line(term: Terminal, l: usize) []Cell {
@@ -1266,6 +1271,15 @@ test "box" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &box(int("", usize(1000))),
+    );
+    testDraw(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\r\n" ++
+        "┃10000000000000000000000000000000000000┃\r\n" ++
+        "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\r\n" ++
+        "                                        \r\n" ++
+        "                                        \r\n" ++
+        "                                        " ++ full_reset,
+        &box(int("", u128(100000000000000000000000000000000000009))),
     );
 }
 
