@@ -257,7 +257,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
         },
         save_key => editor = try editor.save(),
         undo_key => editor = try editor.undo(),
-        copy_key => editor = editor.copy(),
+        copy_key => try editor.copyClipboard(),
         paste_key => text = try text.pasteText(editor.copied()),
         select_all_key => {
             // It is faster to manually delete all cursors first

@@ -9,11 +9,7 @@ const os = std.os;
 
 const ChildProcess = std.ChildProcess;
 
-// TODO: instead of taking, and returning slices, we can actually
-//       return the stdin stdout file handles. This will allow for
-//       streaming data to the child process, and once done, the
-//       file can be closed.
-pub fn copy(allocator: *mem.Allocator, bytes: []const u8) !ChildProcess {
+pub fn copy(allocator: *mem.Allocator) !*ChildProcess {
     var env = try process.getEnvMap(allocator);
     defer env.deinit();
 
@@ -21,15 +17,15 @@ pub fn copy(allocator: *mem.Allocator, bytes: []const u8) !ChildProcess {
 
     var buf: [os.PATH_MAX]u8 = undefined;
     if (getPathToExe(&buf, path, "xclip")) |p| {
-        _ = try exec(allocator, [_][]const u8{ p, "-selection", "clipboard" }, .Pipe, .Ignore);
+        return try exec(allocator, [_][]const u8{ p, "-selection", "clipboard" }, .Pipe, .Ignore);
     } else if (getPathToExe(&buf, path, "xsel")) |p| blk: {
-        _ = try exec(allocator, [_][]const u8{ p, "-b" }, .Pipe, .Ignore);
-    } else {
-        return error.NoCopyCommand;
+        return try exec(allocator, [_][]const u8{ p, "-b" }, .Pipe, .Ignore);
     }
+
+    return error.NoCopyCommand;
 }
 
-pub fn paste(allocator: *mem.Allocator) !ChildProcess {
+pub fn paste(allocator: *mem.Allocator) !*ChildProcess {
     var env = try process.getEnvMap(allocator);
     defer env.deinit();
 
@@ -40,9 +36,9 @@ pub fn paste(allocator: *mem.Allocator) !ChildProcess {
         return try exec(allocator, [_][]const u8{ p, "-selection", "clipboard", "-o" }, .Ignore, .Pipe);
     } else if (getPathToExe(&buf, path, "xsel")) |p| blk: {
         return try exec(allocator, [_][]const u8{ p, "-b" }, .Ignore, .Pipe);
-    } else {
-        return error.NoCopyCommand;
     }
+
+    return error.NoCopyCommand;
 }
 
 fn exec(
@@ -50,7 +46,7 @@ fn exec(
     argv: []const []const u8,
     stdin: ChildProcess.StdIo,
     stdout: ChildProcess.StdIo,
-) !ChildProcess {
+) !*ChildProcess {
     const p = try ChildProcess.init(argv, allocator);
 
     p.stdin_behavior = stdin;

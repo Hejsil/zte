@@ -1,5 +1,4 @@
 test "" {
-    _ = @import("clipboard.zig");
     _ = @import("core.zig");
     _ = @import("draw.zig");
     _ = @import("terminal.zig");

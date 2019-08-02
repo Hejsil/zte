@@ -1,3 +1,4 @@
+pub const clipboard = @import("core/clipboard.zig");
 const editor = @import("core/editor.zig");
 const list = @import("core/list.zig");
 const text = @import("core/text.zig");
@@ -12,6 +13,7 @@ pub const NoAllocatorList = list.NoAllocatorList;
 pub const Text = text.Text;
 
 test "" {
+    _ = clipboard;
     _ = editor;
     _ = list;
     _ = text;

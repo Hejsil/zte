@@ -17,6 +17,7 @@ pub const File = struct {
 };
 
 pub const Editor = struct {
+    allocator: *mem.Allocator,
     history: History,
     history_pos: usize = 0,
     on_disk_pos: usize = 0,
@@ -24,7 +25,10 @@ pub const Editor = struct {
     file: ?File = null,
 
     pub fn fromString(allocator: *mem.Allocator, str: []const u8) !Editor {
-        var res = Editor{ .history = History{ .allocator = allocator } };
+        var res = Editor{
+            .allocator = allocator,
+            .history = History{ .allocator = allocator },
+        };
         const t = try core.Text.fromString(allocator, str);
         res.history = try res.history.append(t);
         return res;
@@ -118,5 +122,58 @@ pub const Editor = struct {
         var res = editor;
         res.copy_pos = res.history_pos;
         return res;
+    }
+
+    pub fn copyClipboard(editor: Editor) !void {
+        const allocator = editor.allocator;
+        const text = editor.current();
+        const proc = try core.clipboard.copy(allocator);
+        errdefer _ = proc.kill() catch undefined;
+
+        var file_out = proc.stdin.?.outStream();
+        var buf_out = io.BufferedOutStream(fs.File.OutStream.Error).init(&file_out.stream);
+        const Stream = io.OutStream(fs.File.OutStream.Error);
+        const Context = struct {
+            stream: *Stream,
+            text: core.Text,
+            end: usize = 0,
+        };
+
+        try text.cursors.foreach(
+            0,
+            Context{
+                .stream = &buf_out.stream,
+                .text = text,
+            },
+            struct {
+                fn each(c: Context, i: usize, cursor: core.Cursor) !void {
+                    if (i != 0)
+                        try c.stream.write("\n");
+
+                    var new_c = c;
+                    new_c.end = cursor.end().index;
+                    c.text.content.foreach(
+                        cursor.start().index,
+                        new_c,
+                        struct {
+                            fn each2(context: Context, j: usize, char: u8) !void {
+                                if (j == context.end)
+                                    return error.Break;
+
+                                try context.stream.write([_]u8{char});
+                            }
+                        }.each2,
+                    ) catch |err| switch (err) {
+                        error.Break => {},
+                        else => |err2| return err2,
+                    };
+                }
+            }.each,
+        );
+
+        try buf_out.flush();
+        proc.stdin.?.close();
+        proc.stdin = null;
+        const term = try proc.wait();
     }
 };
