@@ -13,7 +13,7 @@ pub const History = core.List(core.Text);
 
 pub const File = struct {
     path: []const u8,
-    stat: os.Stat,
+    stat: ?os.Stat,
 };
 
 pub const Editor = struct {
@@ -35,7 +35,18 @@ pub const Editor = struct {
     }
 
     pub fn fromFile(allocator: *mem.Allocator, path: []const u8) !Editor {
-        const file = try fs.File.openRead(path);
+        const file = fs.File.openRead(path) catch |err| switch (err) {
+            error.FileNotFound => {
+                var res = try fromString(allocator, "");
+                res.file = File{
+                    .path = path,
+                    .stat = null,
+                };
+
+                return res;
+            },
+            else => |err2| return err2,
+        };
         defer file.close();
 
         const stat = try os.fstat(file.handle);
