@@ -239,7 +239,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
     var view = app.view;
     var text = editor.current();
 
-    debug.warn("{}\n", Key.toStr(key));
+    //debug.warn("{}\n", Key.toStr(key));
     switch (key) {
         reset_key => {
             text = text.removeAllButMainCursor();

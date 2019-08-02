@@ -106,14 +106,14 @@ pub fn readKey(stdin: fs.File) !Key.Type {
         len = try stdin.read(&buf);
     const key = buf[0..len];
 
-    debug.warn("------------\n");
-    for (key) |b| {
-        if (ascii.isPrint(b)) {
-            debug.warn("{} 0x{x:2} {b:8} '{c}'\n", b, b, b, b);
-        } else {
-            debug.warn("{} 0x{x:2} {b:8}\n", b, b, b);
-        }
-    }
+    //debug.warn("------------\n");
+    //for (key) |b| {
+    //    if (ascii.isPrint(b)) {
+    //        debug.warn("{} 0x{x:2} {b:8} '{c}'\n", b, b, b, b);
+    //    } else {
+    //        debug.warn("{} 0x{x:2} {b:8}\n", b, b, b);
+    //    }
+    //}
     switch (key.len) {
         1 => switch (key[0]) {
             '\x1b' => return Key.esc,
