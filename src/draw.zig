@@ -841,7 +841,7 @@ pub const Terminal = struct {
             var i: usize = 0;
             while (i < term_size.height) : (i += 1) {
                 const digit = view.line_loc.line + i + 1;
-                const line_num = right(int("", digit));
+                const line_num = foreground(.BrightBlack, right(int("", digit)));
                 new_term.top_left.y = term.top_left.y + i;
                 new_term.bot_right.y = new_term.top_left.y + 1;
                 new_term.draw(&line_num);
@@ -887,6 +887,7 @@ pub const Terminal = struct {
         while (i < term_size.height) : (i += 1) {
             const cells = new_term.line(i);
             cells[0].char = '~';
+            cells[0].foreground = .BrightBlack;
         }
 
         var cursors = text.cursors.iterator(0);
@@ -1268,28 +1269,34 @@ test "box" {
     );
 }
 // zig fmt: on
-fn backg(comptime num: []const u8, comptime str: []const u8) []const u8 {
-    const underscore_start = vt100.selectGraphicRendition("0") ++
+fn backgStart(comptime num: []const u8) []const u8 {
+    return vt100.selectGraphicRendition("0") ++
         vt100.selectGraphicRendition("39") ++
         vt100.selectGraphicRendition(num);
+}
 
-    return underscore_start ++ str ++ full_reset;
+fn backg(comptime num: []const u8, comptime str: []const u8) []const u8 {
+    return backgStart(num) ++ str ++ full_reset;
+}
+
+fn foregStart(comptime num: []const u8) []const u8 {
+    return vt100.selectGraphicRendition("0") ++
+        vt100.selectGraphicRendition(num) ++
+        vt100.selectGraphicRendition("49");
 }
 
 fn foreg(comptime num: []const u8, comptime str: []const u8) []const u8 {
-    const underscore_start = vt100.selectGraphicRendition("0") ++
-        vt100.selectGraphicRendition(num) ++
-        vt100.selectGraphicRendition("49");
+    return foregStart(num) ++ str ++ full_reset;
+}
 
-    return underscore_start ++ str ++ full_reset;
+fn attriStart(comptime num: []const u8) []const u8 {
+    return vt100.selectGraphicRendition(num) ++
+        vt100.selectGraphicRendition("39") ++
+        vt100.selectGraphicRendition("49");
 }
 
 fn attri(comptime num: []const u8, comptime str: []const u8) []const u8 {
-    const underscore_start = vt100.selectGraphicRendition(num) ++
-        vt100.selectGraphicRendition("39") ++
-        vt100.selectGraphicRendition("49");
-
-    return underscore_start ++ str ++ full_reset;
+    return attriStart(num) ++ str ++ full_reset;
 }
 
 // zig fmt: off
@@ -1395,12 +1402,12 @@ test "textView" {
         &textView(false, text),
     );
     testDraw(
-        "1 " ++ attri("4", "A") ++ "                                     \r\n" ++
-        "2 B                                     \r\n" ++
-        "3 C                                     \r\n" ++
-        "4 D                                     \r\n" ++
-        "5 E                                     \r\n" ++
-        "6 F                                     " ++ full_reset,
+        foreg("90", "1") ++ " " ++ attri("4", "A") ++ "                                     \r\n" ++
+        foreg("90", "2") ++ " B                                     \r\n" ++
+        foreg("90", "3") ++ " C                                     \r\n" ++
+        foreg("90", "4") ++ " D                                     \r\n" ++
+        foreg("90", "5") ++ " E                                     \r\n" ++
+        foreg("90", "6") ++ " F                                     " ++ full_reset,
         &textView(true, text),
     );
 
@@ -1415,12 +1422,12 @@ test "textView" {
         &textView(false, text),
     );
     testDraw(
-        " 5 E                                    \r\n" ++
-        " 6 F                                    \r\n" ++
-        " 7 G                                    \r\n" ++
-        " 8 H                                    \r\n" ++
-        " 9 I                                    \r\n" ++
-        "10 " ++ attri("4", "J") ++ "                                    " ++ full_reset,
+        foreg("90", " 5") ++ " E                                    \r\n" ++
+        foreg("90", " 6") ++ " F                                    \r\n" ++
+        foreg("90", " 7") ++ " G                                    \r\n" ++
+        foreg("90", " 8") ++ " H                                    \r\n" ++
+        foreg("90", " 9") ++ " I                                    \r\n" ++
+        foreg("90", "10") ++ " " ++ attri("4", "J") ++ "                                    " ++ full_reset,
         &textView(true, text),
     );
 
@@ -1429,18 +1436,18 @@ test "textView" {
         attri("4", "A") ++ "BCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno\r\n" ++
         ":                                       \r\n" ++
         "                                        \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       " ++ full_reset,
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       " ++ full_reset,
         &textView(false, text),
     );
     testDraw(
-        "1 " ++ attri("4", "A") ++ "BCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklm\r\n" ++
-        "2 :                                     \r\n" ++
-        "3                                       \r\n" ++
-        "4 ~                                     \r\n" ++
-        "5 ~                                     \r\n" ++
-        "6 ~                                     " ++ full_reset,
+        foreg("90", "1") ++ " " ++ attri("4", "A") ++ "BCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklm\r\n" ++
+        foreg("90", "2") ++ " :                                     \r\n" ++
+        foreg("90", "3") ++ "                                       \r\n" ++
+        foreg("90", "4") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "5") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
         &textView(true, text),
     );
     
@@ -1449,18 +1456,18 @@ test "textView" {
         "BCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno" ++ attri("4", "p\r\n") ++
         "                                        \r\n" ++
         "                                        \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       " ++ full_reset,
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       " ++ full_reset,
         &textView(false, text),
     );
     testDraw(
-        "1 DEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno" ++ attri("4", "p\r\n") ++
-        "2                                       \r\n" ++
-        "3                                       \r\n" ++
-        "4 ~                                     \r\n" ++
-        "5 ~                                     \r\n" ++
-        "6 ~                                     " ++ full_reset,
+        foreg("90", "1") ++ " DEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno" ++ attriStart("4") ++ "p\r\n" ++
+        foreg("90", "2") ++ "                                       \r\n" ++
+        foreg("90", "3") ++ "                                       \r\n" ++
+        foreg("90", "4") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "5") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
         &textView(true, text),
     );
     
@@ -1471,18 +1478,18 @@ test "textView" {
         attri("7", "ABCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno\r\n") ++
         ":                                       \r\n" ++
         "                                        \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       \r\n" ++
-        "~                                       " ++ full_reset,
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       " ++ full_reset,
         &textView(false, text),
     );
     testDraw(
-        "1 " ++ attri("7", "ABCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklm\r\n") ++
-        "2 :                                     \r\n" ++
-        "3                                       \r\n" ++
-        "4 ~                                     \r\n" ++
-        "5 ~                                     \r\n" ++
-        "6 ~                                     " ++ full_reset,
+        foreg("90", "1") ++ " " ++ attriStart("7") ++ "ABCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklm\r\n" ++
+        foreg("90", "2") ++ " :                                     \r\n" ++
+        foreg("90", "3") ++ "                                       \r\n" ++
+        foreg("90", "4") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "5") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
         &textView(true, text),
     );
 }
@@ -1505,7 +1512,7 @@ fn escape(allocator: *mem.Allocator, str: []const u8) ![]u8 {
 }
 
 fn testDraw(expect: []const u8, view: var) void {
-    var buf: [1024 * 4]u8 = undefined;
+    var buf: [1024 * 8]u8 = undefined;
     var fba = heap.FixedBufferAllocator.init(&buf);
     var term = Terminal{ .allocator = &fba.allocator };
     term.update(Size{ .width = 40, .height = 6 }) catch unreachable;
