@@ -801,21 +801,21 @@ pub const Terminal = struct {
             const cells = term.line(y);
             for (cells) |*cell, x| {
                 if (x == 0 and y == 0) {
-                    cell.char = '#';
+                    cell.char = comptime unicode.utf8Decode("┏") catch unreachable;
                 } else if (x == 0 and y == term_size.height - 1) {
-                    cell.char = '#';
+                    cell.char = comptime unicode.utf8Decode("┗") catch unreachable;
                 } else if (x == term_size.width - 1 and y == term_size.height - 1) {
-                    cell.char = '#';
+                    cell.char = comptime unicode.utf8Decode("┛") catch unreachable;
                 } else if (x == term_size.width - 1 and y == 0) {
-                    cell.char = '#';
+                    cell.char = comptime unicode.utf8Decode("┓") catch unreachable;
                 } else if (x == 0) {
-                    cell.char = '|';
+                    cell.char = comptime unicode.utf8Decode("┃") catch unreachable;
                 } else if (x == term_size.width - 1) {
-                    cell.char = '|';
+                    cell.char = comptime unicode.utf8Decode("┃") catch unreachable;
                 } else if (y == 0) {
-                    cell.char = '-';
+                    cell.char = comptime unicode.utf8Decode("━") catch unreachable;
                 } else if (y == term_size.height - 1) {
-                    cell.char = '-';
+                    cell.char = comptime unicode.utf8Decode("━") catch unreachable;
                 }
             }
         }
@@ -1259,15 +1259,16 @@ test "visible" {
 
 test "box" {
     testDraw(
-        "#----#                                  \r\n" ++
-        "|1000|                                  \r\n" ++
-        "#----#                                  \r\n" ++
+        "┏━━━━┓                                  \r\n" ++
+        "┃1000┃                                  \r\n" ++
+        "┗━━━━┛                                  \r\n" ++
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &box(int("", usize(1000))),
     );
 }
+
 // zig fmt: on
 fn backgStart(comptime num: []const u8) []const u8 {
     return vt100.selectGraphicRendition("0") ++
