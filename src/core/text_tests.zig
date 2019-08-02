@@ -253,6 +253,33 @@ test "insert" {
     }
 }
 
+test "paste" {
+    var buf: [1024 * 1024]u8 = undefined;
+
+    const TestCast = struct {
+        str: []const u8,
+        before: []const u8,
+        after: []const u8,
+
+        fn init(str: []const u8, before: []const u8, after: []const u8) @This() {
+            return @This(){
+                .str = str,
+                .before = before,
+                .after = after,
+            };
+        }
+    };
+    inline for (comptime [_]TestCast{
+        TestCast.init("a", "a[]b[]d[ef]", "aa[]ba[]da[]"),
+        TestCast.init("aabbcc", "a[]b[]d[ef]", "aaabbcc[]baabbcc[]daabbcc[]"),
+        TestCast.init("a\nb\nc", "a[]b[]d[ef]", "aa[]bb[]dc[]"),
+    }) |case| {
+        const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
+        const t = try makeText(allocator, case.before).paste(case.str);
+        expect(t, case.after);
+    }
+}
+
 test "insertText" {
     var buf: [1024 * 1024]u8 = undefined;
 

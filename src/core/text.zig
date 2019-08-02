@@ -445,6 +445,32 @@ pub const Text = struct {
         }.action);
     }
 
+    pub fn paste(text: Text, string: []const u8) !Text {
+        var it = mem.separate(string, "\n");
+        var lines: usize = 0;
+        while (it.next()) |_| : (lines += 1) {}
+
+        if (text.cursors.len() != lines)
+            return insert(text, string);
+
+        it = mem.separate(string, "\n");
+        return text.foreachCursor(&it, struct {
+            fn each(split: *mem.SplitIterator, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
+                var res = cc;
+                const s = res.cursor.start();
+                const e = res.cursor.end();
+                res.cursor.index = s;
+                res.cursor.selection = s;
+
+                const line = split.next().?;
+                res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
+                res.content = try res.content.insertSlice(allocator, res.cursor.start().index, line);
+                res.cursor = res.cursor.move(res.content, line.len, .Both, .Right);
+                return res;
+            }
+        }.each);
+    }
+
     pub fn insertText(text: Text, other: Text) !Text {
         return text.foreachCursor(other, struct {
             fn each(t: Text, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {

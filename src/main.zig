@@ -109,9 +109,9 @@ const help_popup = blk: {
             "'" ++ Key.toStr(spawn_cursor_down_key) ++ "': spawn a cursor below the main cursor\n" ++
             "'" ++ Key.toStr(spawn_cursor_left_key) ++ "': spawn a cursor to the left of the main cursor\n" ++
             "'" ++ Key.toStr(spawn_cursor_right_key) ++ "': spawn a cursor to the right of the main cursor\n" ++
-            "'" ++ Key.toStr(remove_all_spawned_cursors_key) ++ "': remove all spawned cursors\n" ++
             "'" ++ Key.toStr(delete_left_key) ++ "': delete letter to the left of cursors\n" ++
-            "'" ++ Key.toStr(delete_right_key) ++ "': delete letter to the right of cursors",
+            "'" ++ Key.toStr(delete_right_key) ++ "': delete letter to the right of cursors\n" ++
+            "'" ++ Key.toStr(reset_key) ++ "': general key to cancel/reset/stop the current action",
     ) catch unreachable)))));
 };
 
@@ -218,9 +218,9 @@ const spawn_cursor_up_key = Key.ctrl | Key.arrow_up;
 const spawn_cursor_down_key = Key.ctrl | Key.arrow_down;
 const spawn_cursor_left_key = Key.ctrl | Key.arrow_left;
 const spawn_cursor_right_key = Key.ctrl | Key.arrow_right;
-const remove_all_spawned_cursors_key = Key.ctrl | 'k';
 const delete_left_key = Key.backspace;
 const delete_right_key = Key.delete;
+const reset_key = Key.esc;
 
 const default_hint = "'" ++ Key.toStr(help_key) ++ "' for help";
 
@@ -240,7 +240,9 @@ fn handleInput(app: App, key: Key.Type) !?App {
     var text = editor.current();
 
     switch (key) {
-        Key.unknown => {},
+        reset_key => {
+            text = text.removeAllButMainCursor();
+        },
 
         help_key => view.children.help_popup.visibility = switch (view.children.help_popup.visibility) {
             .Show => draw.Visibility.Hide,
@@ -258,7 +260,10 @@ fn handleInput(app: App, key: Key.Type) !?App {
         save_key => editor = try editor.save(),
         undo_key => editor = try editor.undo(),
         copy_key => try editor.copyClipboard(),
-        paste_key => text = try text.pasteText(editor.copied()),
+        paste_key => {
+            editor = try editor.pasteClipboard();
+            text = editor.current();
+        },
         select_all_key => {
             // It is faster to manually delete all cursors first
             // instead of letting the editor logic merge the cursors
@@ -290,15 +295,13 @@ fn handleInput(app: App, key: Key.Type) !?App {
         spawn_cursor_left_key => text = try text.spawnCursor(.Left),
         spawn_cursor_right_key => text = try text.spawnCursor(.Right),
 
-        // Remove cursor
-        remove_all_spawned_cursors_key => text = text.removeAllButMainCursor(),
-
         // Delete
         delete_left_key => text = try text.delete(.Left),
         delete_right_key => text = try text.delete(.Right),
 
-        // Every other key is inserted if they are printable ascii
         Key.enter => text = try text.insert("\n"),
+
+        // Every other key is inserted if they are printable ascii
         else => {
             if (ascii.isPrint(math.cast(u8, key) catch 0))
                 text = try text.insert([_]u8{@intCast(u8, key)});

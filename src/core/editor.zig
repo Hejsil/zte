@@ -176,4 +176,26 @@ pub const Editor = struct {
         proc.stdin = null;
         const term = try proc.wait();
     }
+
+    pub fn pasteClipboard(editor: Editor) !Editor {
+        const allocator = editor.allocator;
+        var res = editor;
+        var text = res.current();
+        const proc = try core.clipboard.paste(allocator);
+        errdefer _ = proc.kill() catch undefined;
+
+        var file_out = proc.stdout.?.inStream();
+        const str = try file_out.stream.readAllAlloc(allocator, 1024 * 1024 * 512);
+        switch (try proc.wait()) {
+            .Exited => |status| {
+                if (status != 0)
+                    return error.CopyFailed;
+            },
+            else => return error.CopyFailed,
+        }
+
+        text = try text.paste(str);
+        res = try res.addUndo(text);
+        return res;
+    }
 };
