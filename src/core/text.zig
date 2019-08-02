@@ -391,36 +391,37 @@ pub const Text = struct {
             dir: Cursor.Direction,
         };
         return text.foreachCursor(Args{ .amount = amount, .to_move = to_move, .dir = dir }, struct {
-            fn action(args: Args, allocator: *mem.Allocator, content: Content, i: usize, curr: *Cursor) error{}!Content {
-                curr.* = curr.move(content, args.amount, args.to_move, args.dir);
-                return content;
+            fn action(args: Args, allocator: *mem.Allocator, cc: CursorContent, i: usize) error{}!CursorContent {
+                var res = cc;
+                res.cursor = res.cursor.move(res.content, args.amount, args.to_move, args.dir);
+                return res;
             }
         }.action);
     }
 
     pub fn delete(text: Text, direction: DeleteDir) !Text {
         return text.foreachCursor(direction, struct {
-            fn action(dir: DeleteDir, allocator: *mem.Allocator, content: Content, i: usize, curr: *Cursor) !Content {
-                var res = content;
-                if (Location.equal(curr.index, curr.selection)) {
+            fn action(dir: DeleteDir, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
+                var res = cc;
+                if (Location.equal(res.cursor.index, res.cursor.selection)) {
                     switch (dir) {
                         .Left => {
-                            if (curr.index.index != 0) {
-                                curr.* = curr.move(content, 1, .Both, .Left);
-                                res = try res.remove(allocator, curr.index.index);
+                            if (res.cursor.index.index != 0) {
+                                res.cursor = res.cursor.move(res.content, 1, .Both, .Left);
+                                res.content = try res.content.remove(allocator, res.cursor.index.index);
                             }
                         },
                         .Right => {
-                            if (curr.index.index != content.len())
-                                res = try res.remove(allocator, curr.index.index);
+                            if (res.cursor.index.index != res.content.len())
+                                res.content = try res.content.remove(allocator, res.cursor.index.index);
                         },
                     }
                 } else {
-                    const s = curr.start();
-                    const e = curr.end();
-                    curr.index = s;
-                    curr.selection = s;
-                    res = try res.removeItems(allocator, s.index, e.index - s.index);
+                    const s = res.cursor.start();
+                    const e = res.cursor.end();
+                    res.cursor.index = s;
+                    res.cursor.selection = s;
+                    res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
                 }
 
                 return res;
@@ -430,15 +431,15 @@ pub const Text = struct {
 
     pub fn insert(text: Text, string: []const u8) !Text {
         return text.foreachCursor(string, struct {
-            fn action(str: []const u8, allocator: *mem.Allocator, content: Content, i: usize, curr: *Cursor) !Content {
-                var res = content;
-                const s = curr.start();
-                const e = curr.end();
-                curr.index = s;
-                curr.selection = s;
-                res = try res.removeItems(allocator, s.index, e.index - s.index);
-                res = try res.insertSlice(allocator, s.index, str);
-                curr.* = curr.move(res, str.len, .Both, .Right);
+            fn action(str: []const u8, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
+                var res = cc;
+                const s = res.cursor.start();
+                const e = res.cursor.end();
+                res.cursor.index = s;
+                res.cursor.selection = s;
+                res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
+                res.content = try res.content.insertSlice(allocator, s.index, str);
+                res.cursor = res.cursor.move(res.content, str.len, .Both, .Right);
                 return res;
             }
         }.action);
@@ -446,19 +447,19 @@ pub const Text = struct {
 
     pub fn insertText(text: Text, other: Text) !Text {
         return text.foreachCursor(other, struct {
-            fn each(t: Text, allocator: *mem.Allocator, content: Content, i: usize, curr: *Cursor) !Content {
-                var res = content;
-                const s = curr.start();
-                const e = curr.end();
-                curr.index = s;
-                curr.selection = s;
-                res = try res.removeItems(allocator, s.index, e.index - s.index);
+            fn each(t: Text, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
+                var res = cc;
+                const s = res.cursor.start();
+                const e = res.cursor.end();
+                res.cursor.index = s;
+                res.cursor.selection = s;
+                res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
 
                 var it = t.cursors.iterator(0);
                 while (it.next()) |cursor| {
                     const to_insert = try t.content.slice(allocator, cursor.start().index, cursor.end().index);
-                    res = try res.insertList(allocator, curr.start().index, to_insert);
-                    curr.* = curr.move(res, to_insert.len(), .Both, .Right);
+                    res.content = try res.content.insertList(allocator, res.cursor.start().index, to_insert);
+                    res.cursor = res.cursor.move(res.content, to_insert.len(), .Both, .Right);
                 }
 
                 return res;
@@ -476,24 +477,29 @@ pub const Text = struct {
             return insertText(text, other);
 
         return text.foreachCursor(other, struct {
-            fn each(t: Text, allocator: *mem.Allocator, content: Content, i: usize, curr: *Cursor) !Content {
-                var res = content;
-                const s = curr.start();
-                const e = curr.end();
-                curr.index = s;
-                curr.selection = s;
+            fn each(t: Text, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
+                var res = cc;
+                const s = res.cursor.start();
+                const e = res.cursor.end();
+                res.cursor.index = s;
+                res.cursor.selection = s;
 
                 const selection = t.cursors.at(i);
                 const to_insert = try t.content.slice(allocator, selection.start().index, selection.end().index);
-                res = try res.removeItems(allocator, s.index, e.index - s.index);
-                res = try res.insertList(allocator, curr.start().index, to_insert);
-                curr.* = curr.move(res, to_insert.len(), .Both, .Right);
+                res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
+                res.content = try res.content.insertList(allocator, res.cursor.start().index, to_insert);
+                res.cursor = res.cursor.move(res.content, to_insert.len(), .Both, .Right);
                 return res;
             }
         }.each);
     }
 
-    // action: fn (@typeOf(content), Text, usize, *Cursor) !Text
+    const CursorContent = struct {
+        cursor: Cursor,
+        content: Content,
+    };
+
+    // action: fn (@typeOf(content), CursorContent, usize) !CursorContent
     fn foreachCursor(text: Text, context: var, action: var) !Text {
         debug.assert(text.cursors.len() != 0);
         var res = text;
@@ -508,29 +514,37 @@ pub const Text = struct {
         while (it.next()) |cursor| : (i += 1) {
             const index_index = (cursor.index.index + added) - deleted;
             const selection_index = (cursor.selection.index + added) - deleted;
-            var curr = Cursor{
-                .index = prev_loc.moveTo(index_index, res.content),
-                .selection = prev_loc.moveTo(selection_index, res.content),
-            };
 
             const old_len = res.content.len();
-            res.content = try action(context, res.allocator, res.content, i, &curr);
+            const pair = try action(
+                context,
+                res.allocator,
+                CursorContent{
+                    .cursor = Cursor{
+                        .index = prev_loc.moveTo(index_index, res.content),
+                        .selection = prev_loc.moveTo(selection_index, res.content),
+                    },
+                    .content = res.content,
+                },
+                i,
+            );
+            res.content = pair.content;
             if (math.sub(usize, old_len, res.content.len())) |taken| {
                 deleted += taken;
             } else |_| {
                 added += res.content.len() - old_len;
             }
 
-            prev_loc = curr.end();
+            prev_loc = pair.cursor.end();
             if (m_prev) |prev| {
-                if (mergeCursors(prev, curr)) |merged| {
+                if (mergeCursors(prev, pair.cursor)) |merged| {
                     m_prev = merged;
                 } else {
                     try res.cursors.appendMut(text.allocator, prev);
-                    m_prev = curr;
+                    m_prev = pair.cursor;
                 }
             } else {
-                m_prev = curr;
+                m_prev = pair.cursor;
             }
         }
 
