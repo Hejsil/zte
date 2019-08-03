@@ -304,6 +304,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
         delete_right_key => text = try text.delete(.Right),
 
         Key.enter => text = try text.insert("\n"),
+        Key.tab => text = try text.indent(' ', 4),
 
         // Every other key is inserted if they are printable ascii
         else => {

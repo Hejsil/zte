@@ -520,6 +520,35 @@ pub const Text = struct {
         }.each);
     }
 
+    pub fn indent(text: Text, char: u8, num: usize) !Text {
+        const Context = struct {
+            char: u8,
+            num: usize,
+        };
+
+        return text.foreachCursor(Context{
+            .char = char,
+            .num = num,
+        }, struct {
+            fn each(context: Context, allocator: *mem.Allocator, cc: CursorContent, _: usize) !CursorContent {
+                var res = cc;
+                const s = res.cursor.start();
+                const e = res.cursor.end();
+                res.cursor.index = s;
+                res.cursor.selection = s;
+
+                res.content = try res.content.removeItems(allocator, s.index, e.index - s.index);
+                const to_insert = context.num - s.column % context.num;
+                var i = to_insert;
+                while (i != 0) : (i -= 1)
+                    res.content = try res.content.insert(allocator, res.cursor.start().index, context.char);
+
+                res.cursor = res.cursor.move(res.content, to_insert, .Both, .Right);
+                return res;
+            }
+        }.each);
+    }
+
     const CursorContent = struct {
         cursor: Cursor,
         content: Content,

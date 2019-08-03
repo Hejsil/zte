@@ -16,7 +16,7 @@ pub const Key = struct {
     pub const esc: Type = '\x1b';
 
     pub const enter: Type = ctrl | 'm';
-    pub const backspace: Type = '\x7f';
+    pub const backspace: Type = ctrl | 'h';
 
     pub const arrow_up: Type = 0x0100;
     pub const arrow_down: Type = 0x0200;
@@ -27,6 +27,7 @@ pub const Key = struct {
     pub const home: Type = 0x0700;
     pub const end: Type = 0x0800;
     pub const delete: Type = 0x0900;
+    pub const tab: Type = 0x0A00;
 
     pub const ctrl: Type = 0b10000000000000000000000000000000;
     pub const alt: Type = 0b01000000000000000000000000000000;
@@ -116,6 +117,7 @@ pub fn readKey(stdin: fs.File) !Key.Type {
     //}
     switch (key.len) {
         1 => switch (key[0]) {
+            '\x09' => return Key.tab,
             '\x1b' => return Key.esc,
             '\x7f' => return Key.backspace,
             else => {

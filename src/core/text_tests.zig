@@ -334,6 +334,58 @@ test "pasteText" {
     }
 }
 
+test "indent" {
+    var buf: [1024 * 1024]u8 = undefined;
+
+    const TestCase = struct {
+        indent: u8,
+        num: usize,
+        before: []const u8,
+        after: []const u8,
+
+        fn init(indent: u8, num: usize, before: []const u8, after: []const u8) @This() {
+            return @This(){
+                .indent = indent,
+                .num = num,
+                .before = before,
+                .after = after,
+            };
+        }
+    };
+    inline for (comptime [_]TestCase{
+        TestCase.init(' ', 4,
+            \\[]
+            \\ []
+            \\  []
+            \\   []
+            \\    []
+        ,
+            \\    []
+            \\    []
+            \\    []
+            \\    []
+            \\        []
+        ),
+        TestCase.init(' ', 4,
+            \\[aa]
+            \\ [aa]
+            \\  [aa]
+            \\   [aa]
+            \\    [aa]
+        ,
+            \\    []
+            \\    []
+            \\    []
+            \\    []
+            \\        []
+        ),
+    }) |case| {
+        const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
+        const t = try makeText(allocator, case.before).indent(case.indent, case.num);
+        expect(t, case.after);
+    }
+}
+
 fn expect(found: Text, e: []const u8) void {
     var buf: [1024 * 1024]u8 = undefined;
     var sos = io.SliceOutStream.init(&buf);
