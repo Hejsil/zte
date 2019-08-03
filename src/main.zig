@@ -143,11 +143,11 @@ pub fn main() !void {
     const args = try process.argsAlloc(allocator);
     defer allocator.free(args);
 
+    if (args.len <= 1)
+        return error.NoFileFound;
+
     var app = App{
-        .editor = if (args.len <= 1)
-            try Editor.fromString(allocator, "")
-        else
-            try Editor.fromFile(allocator, args[1]),
+        .editor = try Editor.fromFile(allocator, args[1]),
         .view = window_view,
     };
 
