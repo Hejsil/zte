@@ -225,19 +225,13 @@ const reset_key = Key.esc;
 const default_hint = "'" ++ Key.toStr(help_key) ++ "' for help";
 
 fn handleInput(app: App, key: Key.Type) !?App {
-    const Static = struct {
-        var last_key_pressed = Key.unknown;
-    };
-    defer Static.last_key_pressed = if (key != Key.unknown) key else Static.last_key_pressed;
-
-    // For some reason, using 'Static.last_key_pressed' directly doesn't work. It
-    // compares wrongly against 'key'. If I copy it to a local variable, everything
-    // does work.
-    const last_key_pressed = Static.last_key_pressed;
-
     var editor = app.editor;
     var view = app.view;
     var text = editor.current();
+
+    // clear then "You have unsaved changes popup
+    const quit_popup_is_show = view.children.quit_popup.visibility;
+    view.children.quit_popup.visibility = .Hide;
 
     //debug.warn("{}\n", Key.toStr(key));
     switch (key) {
@@ -252,9 +246,8 @@ fn handleInput(app: App, key: Key.Type) !?App {
 
         // Quit. If there are unsaved changes, then you have to press the quit bottons
         // twice.
-        quit_key => if (editor.dirty()) switch (last_key_pressed) {
-            quit_key => return null,
-            else => view.children.quit_popup.visibility = .Show,
+        quit_key => if (editor.dirty() and quit_popup_is_show != .Show) {
+            view.children.quit_popup.visibility = .Show;
         } else {
             return null;
         },
@@ -311,11 +304,6 @@ fn handleInput(app: App, key: Key.Type) !?App {
             if (ascii.isPrint(math.cast(u8, key) catch 0))
                 text = try text.insert([_]u8{@intCast(u8, key)});
         },
-    }
-    switch (last_key_pressed) {
-        // This will clear the "you have unsaved changes" msg
-        quit_key => view.children.quit_popup.visibility = .Hide,
-        else => {},
     }
 
     // Add new undo point.
