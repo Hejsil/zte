@@ -133,7 +133,8 @@ const window_view = draw.float(struct {
 
 pub fn main() !void {
     var failing = debug.FailingAllocator.init(heap.direct_allocator, math.maxInt(usize));
-    const allocator = &failing.allocator;
+    var arena = heap.ArenaAllocator.init(&failing.allocator);
+    const allocator = &arena.allocator;
 
     const stdin = try io.getStdIn();
     const stdout = try io.getStdOut();
