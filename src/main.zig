@@ -77,8 +77,17 @@ const status_bar = draw.attributes(.Negative, draw.float(struct {
     info: @typeOf(info_view) = info_view,
 }{}));
 
+const goto_prompt_bar = draw.visible(.Hide, draw.attributes(.Negative, draw.customRange(draw.Range{
+    .min = draw.Size{ .width = 0, .height = 1 },
+    .max = draw.Size{ .width = math.maxInt(usize), .height = 1 },
+}, draw.stack(.Horizontal, struct {
+    label: draw.Label = draw.label(.Left, "goto: "),
+    text: draw.TextView = draw.textView(false, core.Text{ .allocator = undefined }), // We init this in main
+}{}))));
+
 const editor_view = draw.stack(.Vertical, struct {
-    text: draw.TextView = draw.textView(true, core.Text{ .allocator = undefined }),
+    text: draw.TextView = draw.textView(true, core.Text{ .allocator = undefined }), // We init this in main
+    goto_prompt_bar: @typeOf(goto_prompt_bar) = goto_prompt_bar,
     status_bar: @typeOf(status_bar) = status_bar,
 }{});
 
@@ -111,6 +120,7 @@ const help_popup = blk: {
             "'" ++ Key.toStr(spawn_cursor_right_key) ++ "': spawn a cursor to the right of the main cursor\n" ++
             "'" ++ Key.toStr(delete_left_key) ++ "': delete letter to the left of cursors\n" ++
             "'" ++ Key.toStr(delete_right_key) ++ "': delete letter to the right of cursors\n" ++
+            "'" ++ Key.toStr(jump_key) ++ "': jump to line\n" ++
             "'" ++ Key.toStr(reset_key) ++ "': general key to cancel/reset/stop the current action",
     ))))));
 };
@@ -151,6 +161,7 @@ pub fn main() !void {
         .editor = try Editor.fromFile(allocator, args[1]),
         .view = window_view,
     };
+    app.view.children.editor.children.goto_prompt_bar.child.child.child.children.text = draw.textView(false, try core.Text.fromString(allocator, ""));
 
     var term = draw.Terminal{ .allocator = allocator };
 
@@ -221,6 +232,7 @@ const spawn_cursor_left_key = Key.ctrl | Key.arrow_left;
 const spawn_cursor_right_key = Key.ctrl | Key.arrow_right;
 const delete_left_key = Key.backspace;
 const delete_right_key = Key.delete;
+const jump_key = Key.ctrl + 'j';
 const reset_key = Key.esc;
 
 const default_hint = "'" ++ Key.toStr(help_key) ++ "' for help";
@@ -230,6 +242,60 @@ fn handleInput(app: App, key: Key.Type) !?App {
     var view = app.view;
     var text = editor.current();
 
+    if (view.children.editor.children.goto_prompt_bar.visibility == .Show) {
+        const prompt = &view.children.editor.children.goto_prompt_bar;
+        const prompt_text = &prompt.child.child.child.children.text.text;
+        switch (key) {
+            Key.enter, jump_key, reset_key => {
+                prompt.visibility = .Hide;
+                prompt_text.* = try core.Text.fromString(prompt_text.allocator, "");
+            },
+
+            select_all_key => {
+                prompt_text.* = try prompt_text.moveCursors(math.maxInt(usize), .Selection, .Left);
+                prompt_text.* = try prompt_text.moveCursors(math.maxInt(usize), .Index, .Right);
+            },
+
+            // Simple move keys. Moves all cursors start and end locations
+            move_left_key => prompt_text.* = try prompt_text.moveCursors(1, .Both, .Left),
+            move_right_key => prompt_text.* = try prompt_text.moveCursors(1, .Both, .Right),
+
+            // Select move keys. Moves only all cursors end location
+            move_select_left_key => prompt_text.* = try prompt_text.*.moveCursors(1, .Index, .Left),
+            move_select_right_key => prompt_text.* = try prompt_text.*.moveCursors(1, .Index, .Right),
+
+            // Delete
+            delete_left_key => prompt_text.* = try prompt_text.delete(.Left),
+            delete_right_key => prompt_text.* = try prompt_text.delete(.Right),
+
+            else => {
+                if (ascii.isDigit(math.cast(u8, key) catch 0))
+                    prompt_text.* = try prompt_text.insert([_]u8{@intCast(u8, key)});
+            },
+        }
+
+        if (prompt_text.content.len() != 0) {
+            var buf: [128]u8 = undefined;
+            var fba = heap.FixedBufferAllocator.init(&buf);
+            const line = if (prompt_text.content.toSlice(&fba.allocator)) |line|
+                std.fmt.parseUnsigned(usize, line, 10) catch math.maxInt(usize)
+            else |_|
+                math.maxInt(usize);
+
+            var cursor = text.mainCursor();
+            cursor.index = cursor.index.moveToLine(math.sub(usize, line, 1) catch 0, text.content);
+            cursor.selection = cursor.index;
+            text.cursors = core.Text.Cursors.fromSliceSmall([_]core.Cursor{cursor});
+        }
+
+        // Add new undo point.
+        editor = try editor.addUndo(text);
+        return App{
+            .editor = editor,
+            .view = view,
+        };
+    }
+
     // clear then "You have unsaved changes popup
     const quit_popup_is_show = view.children.quit_popup.visibility;
     view.children.quit_popup.visibility = .Hide;
@@ -238,6 +304,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
     switch (key) {
         reset_key => {
             text = text.removeAllButMainCursor();
+            view.children.help_popup.visibility = .Hide;
         },
 
         help_key => view.children.help_popup.visibility = switch (view.children.help_popup.visibility) {
@@ -296,6 +363,8 @@ fn handleInput(app: App, key: Key.Type) !?App {
         // Delete
         delete_left_key => text = try text.delete(.Left),
         delete_right_key => text = try text.delete(.Right),
+
+        jump_key => view.children.editor.children.goto_prompt_bar.visibility = .Show,
 
         Key.enter => text = try text.insert("\n"),
         Key.tab => text = try text.indent(' ', 4),
