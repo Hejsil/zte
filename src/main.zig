@@ -35,10 +35,10 @@ pub fn panic(msg: []const u8, error_return_trace: ?*builtin.StackTrace) noreturn
     std.debug.panicExtra(error_return_trace, first_trace_addr, "{}", msg);
 }
 
-const modified_view = draw.visible(.Hide, draw.label(.Left, "(modified) ") catch unreachable);
+const modified_view = draw.visible(.Hide, draw.label(.Left, "(modified) "));
 const file_name_view = draw.stack(.Horizontal, struct {
     modified: @typeOf(modified_view) = modified_view,
-    file_name: draw.Label = draw.label(.Left, "") catch unreachable,
+    file_name: draw.Label = draw.label(.Left, ""),
 }{});
 
 const info_view = draw.right(draw.value("", struct {
@@ -112,7 +112,7 @@ const help_popup = blk: {
             "'" ++ Key.toStr(delete_left_key) ++ "': delete letter to the left of cursors\n" ++
             "'" ++ Key.toStr(delete_right_key) ++ "': delete letter to the right of cursors\n" ++
             "'" ++ Key.toStr(reset_key) ++ "': general key to cancel/reset/stop the current action",
-    ) catch unreachable)))));
+    ))))));
 };
 
 const quit_popup = blk: {
@@ -122,7 +122,7 @@ const quit_popup = blk: {
         "Warning!\n" ++
             "You have unsaved changes.\n" ++
             "Press '" ++ Key.toStr(quit_key) ++ "' to forcefully quit",
-    ) catch unreachable)))));
+    ))))));
 };
 
 const window_view = draw.float(struct {
@@ -168,9 +168,9 @@ pub fn main() !void {
         app.view.children.editor.children.text.text = text;
         bar.file_name.children.modified.visibility = if (app.editor.dirty()) draw.Visibility.Show else draw.Visibility.Hide;
         bar.file_name.children.file_name = if (app.editor.file) |file|
-            try draw.label(.Left, file.path)
+            draw.label(.Left, file.path)
         else
-            try draw.label(.Left, "???");
+            draw.label(.Left, "???");
 
         const size = try terminal.size(stdout, stdin);
         try term.update(draw.Size{

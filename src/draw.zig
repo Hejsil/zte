@@ -145,7 +145,7 @@ pub const Empty = struct {
 };
 
 pub const Label = struct {
-    utf8: unicode.Utf8View,
+    str: []const u8,
     alignment: Alignment,
 
     pub const Alignment = enum {
@@ -156,12 +156,13 @@ pub const Label = struct {
 
     pub fn range(t: @This()) Range {
         var res = Size{};
-        var it = mem.separate(t.utf8.bytes, "\n");
+        var it = mem.separate(t.str, "\n");
         while (it.next()) |line| : (res.height += 1) {
-            var view = unicode.Utf8View.initUnchecked(line);
-            var line_it = view.iterator();
             var line_len: usize = 0;
-            while (line_it.nextCodepointSlice()) |_| : (line_len += 1) {}
+            var i: usize = 0;
+            while (i < line.len) : (line_len += 1)
+                i += unicode.utf8ByteSequenceLength(line[i]) catch 1;
+
             res.width = math.max(res.width, line_len);
         }
 
@@ -169,10 +170,10 @@ pub const Label = struct {
     }
 };
 
-pub fn label(alignment: Label.Alignment, str: []const u8) !Label {
+pub fn label(alignment: Label.Alignment, str: []const u8) Label {
     return Label{
         .alignment = alignment,
-        .utf8 = try unicode.Utf8View.init(str),
+        .str = str,
     };
 }
 
@@ -221,7 +222,7 @@ pub fn Value(comptime format: ValueFormat) type {
         pub fn range(v: @This()) Range {
             var buf: [1024 * 8]u8 = undefined;
             const str = fmt.bufPrint(&buf, "{" ++ value_format.format ++ "}", v.value) catch unreachable;
-            const label_view = label(.Left, str) catch unreachable;
+            const label_view = label(.Left, str);
             return label_view.range();
         }
     };
@@ -605,15 +606,16 @@ pub const Terminal = struct {
     fn drawLabel(term: Terminal, view: Label) void {
         const term_size = term.size();
         var l: usize = 0;
-        var it = mem.separate(view.utf8.bytes, "\n");
+        var it = mem.separate(view.str, "\n");
         while (it.next()) |line_str| : (l += 1) {
             if (term_size.height <= l)
                 break;
 
-            var line_view = unicode.Utf8View.initUnchecked(line_str);
-            var line_it = line_view.iterator();
+            const cells = term.line(l);
             var line_len: usize = 0;
-            while (line_it.nextCodepointSlice()) |_| : (line_len += 1) {}
+            var i: usize = 0;
+            while (i < line_str.len) : (line_len += 1)
+                i += unicode.utf8ByteSequenceLength(line_str[i]) catch 1;
 
             var c: usize = switch (view.alignment) {
                 .Left => 0,
@@ -625,14 +627,27 @@ pub const Terminal = struct {
                 .Center => (math.sub(usize, line_len, term_size.width) catch 0) / 2,
                 .Right => math.sub(usize, line_len, term_size.width) catch 0,
             };
-            line_it = line_view.iterator();
+
+            i = 0;
             while (skip != 0) : (skip -= 1)
-                _ = line_it.nextCodepointSlice();
-            while (line_it.nextCodepoint()) |char| : (c += 1) {
+                i += unicode.utf8ByteSequenceLength(line_str[i]) catch 1;
+            while (i < line_str.len) : (c += 1) {
                 if (term_size.width <= c)
                     break;
-                const cells = term.line(l);
-                cells[c].char = char;
+
+                if (unicode.utf8ByteSequenceLength(line_str[i])) |len| {
+                    if (unicode.utf8Decode(line_str[i..][0..len])) |char| {
+                        cells[c].char = char;
+                    } else |_| {
+                        cells[c].background = .Red;
+                        cells[c].char = '?';
+                    }
+                    i += len;
+                } else |_| {
+                    i += 1;
+                    cells[c].background = .Red;
+                    cells[c].char = '?';
+                }
             }
         }
     }
@@ -640,14 +655,14 @@ pub const Terminal = struct {
     fn drawInt(term: Terminal, view: var) void {
         var buf: [1024]u8 = undefined;
         const str = fmt.bufPrint(&buf, "{" ++ @typeOf(view).int_format.format ++ "}", view.int) catch unreachable;
-        const label_view = label(.Left, str) catch unreachable;
+        const label_view = label(.Left, str);
         term.draw(&label_view);
     }
 
     fn drawValue(term: Terminal, view: var) void {
         var buf: [1024 * 8]u8 = undefined;
         const str = fmt.bufPrint(&buf, "{" ++ @typeOf(view).value_format.format ++ "}", view.value) catch unreachable;
-        const label_view = label(.Left, str) catch unreachable;
+        const label_view = label(.Left, str);
         term.draw(&label_view);
     }
 
@@ -1049,7 +1064,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Left, "Hello World!\nBye World!"),
+        &label(.Left, "Hello World!\nBye World!"),
     );
     testDraw(
         "Hello World!                            \r\n" ++
@@ -1058,7 +1073,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Center, "Hello World!\nBye World!"),
+        &label(.Center, "Hello World!\nBye World!"),
     );
     testDraw(
         "Hello World!                            \r\n" ++
@@ -1067,7 +1082,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Right, "Hello World!\nBye World!"),
+        &label(.Right, "Hello World!\nBye World!"),
     );
     testDraw(
         "Hello World! Hello World! Hello World! H\r\n" ++
@@ -1076,7 +1091,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Left, "Hello World! Hello World! Hello World! Hello World!"),
+        &label(.Left, "Hello World! Hello World! Hello World! Hello World!"),
     );
     testDraw(
         "! Hello World! Hello World! Hello World!\r\n" ++
@@ -1085,7 +1100,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Right, "Hello World! Hello World! Hello World! Hello World!"),
+        &label(.Right, "Hello World! Hello World! Hello World! Hello World!"),
     );
     testDraw(
         " World! Hello World! Hello World! Hello \r\n" ++
@@ -1094,7 +1109,7 @@ test "label" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &try label(.Center, "Hello World! Hello World! Hello World! Hello World!"),
+        &label(.Center, "Hello World! Hello World! Hello World! Hello World!"),
     );
 }
 
@@ -1175,8 +1190,8 @@ test "stack" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &stack(.Horizontal, struct {
-            _0: Label = label(.Left, "Hello") catch unreachable,
-            _1: Label = label(.Left, "World!") catch unreachable,
+            _0: Label = label(.Left, "Hello"),
+            _1: Label = label(.Left, "World!"),
         }{}),
     );
     testDraw(
@@ -1187,8 +1202,8 @@ test "stack" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &stack(.Vertical, struct {
-            _0: Label = label(.Left, "Hello") catch unreachable,
-            _1: Label = label(.Left, "World!") catch unreachable,
+            _0: Label = label(.Left, "Hello"),
+            _1: Label = label(.Left, "World!"),
         }{}),
     );
 }
@@ -1202,8 +1217,8 @@ test "float" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &float(struct {
-            _0: Label = label(.Left, "ABCD") catch unreachable,
-            _1: Label = label(.Left, "11") catch unreachable,
+            _0: Label = label(.Left, "ABCD"),
+            _1: Label = label(.Left, "11"),
         }{}),
     );
 }
@@ -1216,7 +1231,7 @@ test "center" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &center(try label(.Left, "Hello World!")),
+        &center(label(.Left, "Hello World!")),
     );
 }
 
@@ -1228,7 +1243,7 @@ test "right" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &right(try label(.Left, "Hello World!")),
+        &right(label(.Left, "Hello World!")),
     );
     testDraw(
         "                                       2\r\n" ++
@@ -1323,7 +1338,7 @@ test "background" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &background(.White, label(.Left, "Hello World") catch unreachable),
+        &background(.White, label(.Left, "Hello World")),
     );
     testDraw(
         backg("47", "Hello") ++ "World!                             \r\n" ++
@@ -1333,8 +1348,8 @@ test "background" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &stack(.Horizontal, struct {
-            _0: Background(Label) = background(.White, label(.Left, "Hello") catch unreachable),
-            _1: Label = label(.Left, "World!") catch unreachable,
+            _0: Background(Label) = background(.White, label(.Left, "Hello")),
+            _1: Label = label(.Left, "World!"),
         }{}),
     );
 }
@@ -1347,7 +1362,7 @@ test "foreground" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &foreground(.Red, label(.Left, "Hello World") catch unreachable),
+        &foreground(.Red, label(.Left, "Hello World")),
     );
     testDraw(
         foreg("31", "Hello") ++ "World!                             \r\n" ++
@@ -1357,8 +1372,8 @@ test "foreground" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &stack(.Horizontal, struct {
-            _0: Foreground(Label) = foreground(.Red, label(.Left, "Hello") catch unreachable),
-            _1: Label = label(.Left, "World!") catch unreachable,
+            _0: Foreground(Label) = foreground(.Red, label(.Left, "Hello")),
+            _1: Label = label(.Left, "World!"),
         }{}),
     );
 }
@@ -1371,7 +1386,7 @@ test "attributes" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &attributes(.Underscore, label(.Left, "Hello World") catch unreachable),
+        &attributes(.Underscore, label(.Left, "Hello World")),
     );
     testDraw(
         attri("4", "Hello") ++ "World!                             \r\n" ++
@@ -1381,8 +1396,8 @@ test "attributes" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &stack(.Horizontal, struct {
-            _0: Attributes(Label) = attributes(.Underscore, label(.Left, "Hello") catch unreachable),
-            _1: Label = label(.Left, "World!") catch unreachable,
+            _0: Attributes(Label) = attributes(.Underscore, label(.Left, "Hello")),
+            _1: Label = label(.Left, "World!"),
         }{}),
     );
 }
@@ -1397,7 +1412,7 @@ test "float" {
         "                                        \r\n" ++
         "                                        " ++ full_reset,
         &float(struct {
-            _0: Label = label(.Left, "ABCD") catch unreachable,
+            _0: Label = label(.Left, "ABCD"),
             _1: @typeOf(blank) = blank,
         }{}),
     );
