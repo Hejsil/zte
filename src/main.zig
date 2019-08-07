@@ -376,6 +376,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
         jump_key => view.children.editor.children.goto_prompt_bar.visibility = .Show,
 
         Key.enter => text = try text.insert("\n"),
+        Key.space => text = try text.insert(" "),
         Key.tab => text = try text.indent(' ', 4),
 
         // Every other key is inserted if they are printable ascii
