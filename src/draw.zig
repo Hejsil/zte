@@ -974,10 +974,12 @@ pub const Terminal = struct {
                     last_cell.background != cell.background or
                     last_cell.attributes != cell.attributes)
                 {
+                    if (last_cell.attributes != .Reset and cell.attributes != .Reset)
+                        try setAttr(stream, .Reset);
+                    try setAttr(stream, cell.attributes);
+                    try setForeground(stream, cell.foreground);
+                    try setBackground(stream, cell.background);
                     last_cell = cell;
-                    try setAttr(stream, last_cell.attributes);
-                    try setForeground(stream, last_cell.foreground);
-                    try setBackground(stream, last_cell.background);
                 }
 
                 var buf: [4]u8 = undefined;
