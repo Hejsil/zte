@@ -44,6 +44,33 @@ test "moveCursors" {
         TestCast.init(1, .Selection, .Right, "[]a[]b[c]d[ef]", "[ab]c[]de[f]"),
         TestCast.init(1, .Both, .Down,
             \\a[]bc
+            \\defg
+            \\h
+        ,
+            \\abc
+            \\d[]efg
+            \\h
+        ),
+        TestCast.init(1, .Both, .Down,
+            \\abc
+            \\def[g]
+            \\h
+        ,
+            \\abc
+            \\defg
+            \\h[]
+        ),
+        TestCast.init(1, .Both, .Down,
+            \\abc
+            \\defg
+            \\[]h
+        ,
+            \\abc
+            \\defg
+            \\h[]
+        ),
+        TestCast.init(1, .Both, .Down,
+            \\a[]bc
             \\def[g]
             \\[]h
         ,
@@ -99,7 +126,7 @@ test "moveCursors" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).moveCursors(case.amount, case.to_move, case.dir);
-        expect(t, case.after);
+        expect(@tagName(case.to_move) ++ " " ++ @tagName(case.dir), t, case.after);
     }
 }
 
@@ -181,7 +208,7 @@ test "spawnCursor" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).spawnCursor(case.dir);
-        expect(t, case.after);
+        expect(@tagName(case.dir), t, case.after);
     }
 }
 
@@ -194,7 +221,7 @@ test "removeAllButMainCursor" {
         \\[]ab[]cd[]e
         \\fgh[]i
     ).removeAllButMainCursor();
-    expect(t,
+    expect("", t,
         \\abc
         \\abcde
         \\fgh[]i
@@ -223,7 +250,7 @@ test "delete" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).delete(case.dir);
-        expect(t, case.after);
+        expect(@tagName(case.dir), t, case.after);
     }
 }
 
@@ -249,7 +276,7 @@ test "insert" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).insert(case.str);
-        expect(t, case.after);
+        expect(case.str, t, case.after);
     }
 }
 
@@ -276,7 +303,7 @@ test "paste" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).paste(case.str);
-        expect(t, case.after);
+        expect(case.str, t, case.after);
     }
 }
 
@@ -303,7 +330,7 @@ test "insertText" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).insertText(makeText(allocator, case.text));
-        expect(t, case.after);
+        expect(case.text, t, case.after);
     }
 }
 
@@ -330,7 +357,7 @@ test "pasteText" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).pasteText(makeText(allocator, case.text));
-        expect(t, case.after);
+        expect(case.text, t, case.after);
     }
 }
 
@@ -382,11 +409,31 @@ test "indent" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).indent(case.indent, case.num);
-        expect(t, case.after);
+        expect(try std.fmt.allocPrint(allocator, "{} {}", case.indent, case.num), t, case.after);
     }
 }
 
-fn expect(found: Text, e: []const u8) void {
+test "cursor columns are consistent" {
+    var buf: [1024 * 1024]u8 = undefined;
+    const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
+    var t = makeText(allocator, "[]aaaaaaaaaaaaaaaaa\nefg\nhij");
+    t = try t.moveCursors(1, .Both, .Right);
+    expect("", t, "a[]aaaaaaaaaaaaaaaa\nefg\nhij");
+    t = try t.moveCursors(1, .Both, .Right);
+    expect("", t, "aa[]aaaaaaaaaaaaaaa\nefg\nhij");
+    t = try t.moveCursors(1, .Both, .Right);
+    expect("", t, "aaa[]aaaaaaaaaaaaaa\nefg\nhij");
+    t = try t.moveCursors(1, .Both, .Right);
+    expect("", t, "aaaa[]aaaaaaaaaaaaa\nefg\nhij");
+    testing.expectEqual(usize(4), t.mainCursor().index.column);
+    testing.expectEqual(usize(4), t.mainCursor().selection.column);
+    t = try t.moveCursors(1, .Both, .Left);
+    expect("", t, "aaa[]aaaaaaaaaaaaaa\nefg\nhij");
+    testing.expectEqual(usize(3), t.mainCursor().index.column);
+    testing.expectEqual(usize(3), t.mainCursor().selection.column);
+}
+
+fn expect(str: []const u8, found: Text, e: []const u8) void {
     var buf: [1024 * 1024]u8 = undefined;
     var sos = io.SliceOutStream.init(&buf);
     printText(&sos.stream, found);
@@ -395,7 +442,7 @@ fn expect(found: Text, e: []const u8) void {
         debug.warn("\nTest failed!!!\n");
         debug.warn("########## Expect ##########\n{}\n", e);
         debug.warn("########## Actual ##########\n{}\n", sos.getWritten());
-        @panic("");
+        @panic(str);
     }
 }
 

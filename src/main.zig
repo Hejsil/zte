@@ -19,6 +19,8 @@ const process = std.process;
 const Editor = core.Editor;
 const Key = input.Key;
 
+var keys_pressed: std.ArrayList(Key.Type) = undefined;
+
 // TODO: Our custom panic handler does not get called when the program
 //       segfaults and Zig tries to dump a stacktrace from the segfault
 //       point. This means, that our terminal wont be restored and the
@@ -31,6 +33,9 @@ pub fn panic(msg: []const u8, error_return_trace: ?*builtin.StackTrace) noreturn
         terminal.clear(&stdin.outStream().stream) catch {};
         stdin.write(vt100.cursor.show) catch {};
     } else |_| {}
+
+    for (keys_pressed.toSlice()) |key|
+        debug.warn("{s}\n", ([*]const u8)(&Key.toStr(key, .NotCtrl)));
 
     const first_trace_addr = @returnAddress();
     std.debug.panicExtra(error_return_trace, first_trace_addr, "{}", msg);
@@ -160,6 +165,7 @@ pub fn main() !void {
     if (args.len <= 1)
         return error.NoFileFound;
 
+    keys_pressed = std.ArrayList(Key.Type).init(allocator);
     var app = App{
         .editor = try Editor.fromFile(allocator, args[1]),
         .view = window_view,
@@ -197,6 +203,7 @@ pub fn main() !void {
         try stdout_buf.flush();
 
         const key = try input.readKey(stdin);
+        try keys_pressed.append(key);
         info.key = key;
         app = (try handleInput(app, key)) orelse break;
     }
@@ -274,7 +281,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
             move_select_right_key => prompt_text.* = try prompt_text.*.moveCursors(1, .Index, .Right),
 
             // Delete
-            delete_left_key => prompt_text.* = try prompt_text.delete(.Left),
+            delete_left_key, delete_left2_key => prompt_text.* = try prompt_text.delete(.Left),
             delete_right_key => prompt_text.* = try prompt_text.delete(.Right),
 
             else => {

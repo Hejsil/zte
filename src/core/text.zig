@@ -5,6 +5,7 @@ const core = @import("../core.zig");
 const debug = std.debug;
 const math = std.math;
 const mem = std.mem;
+const unicode = std.unicode;
 
 // TODO: Currently we are using this location abstraction to get line, column from a
 //       Cursor. Think about replacing this with the Cursor being a line, column pair,
@@ -71,7 +72,7 @@ pub const Location = struct {
                 break;
         }
 
-        res.column = res.index - i;
+        res.column = calcColumn(i, res.index, text);
         return res;
     }
 
@@ -93,8 +94,6 @@ pub const Location = struct {
         // on 4.5 Gig file, when cursor is at the end. Look at assembly to figure
         // out why. Do more profiling.
         var res = location;
-        res.index = res.lineStart();
-        res.column = 0;
         text.foreach(res.index, ForeachContext{ .index = index, .loc = &res }, struct {
             fn each(context: ForeachContext, i: usize, c: u8) error{Break}!void {
                 const loc = context.loc;
@@ -107,7 +106,7 @@ pub const Location = struct {
             }
         }.each) catch {};
 
-        res.column = index - res.index;
+        res.column = calcColumn(res.index, index, text) + if (res.line == location.line) res.column else 0;
         res.index = index;
         return res;
     }
@@ -149,19 +148,24 @@ pub const Location = struct {
     pub fn moveBackwardToLine(loc: Location, line: usize, text: Text.Content) Location {
         debug.assert(line <= loc.line);
         var res = loc;
-        while (line < res.line) : (res.index -= 1) {
-            const c = text.at(res.index - 1);
-            if (c == '\n')
-                res.line -= 1;
-        }
-        while (res.index != 0) : (res.index -= 1) {
-            const c = text.at(res.index - 1);
-            if (c == '\n')
-                break;
+        if (line != 0) {
+            while (line <= res.line) : (res.index -= 1) {
+                const c = text.at(res.index - 1);
+                if (c == '\n')
+                    res.line -= 1;
+            }
+            debug.assert(text.at(res.index) == '\n');
+            debug.assert(res.line == line - 1);
+            res.line += 1;
+            res.index += 1;
+        } else {
+            res.index = 0;
+            res.line = 0;
         }
 
+        const column = res.column;
         res.column = 0;
-        return res;
+        return res.moveToColumn(column, text);
     }
 
     /// Get the location of the line after 'loc'. If the end of the text
@@ -169,8 +173,6 @@ pub const Location = struct {
     /// 'loc.text'.
     pub fn nextLine(location: Location, text: Text.Content) Location {
         var res = location;
-        res.index = res.lineStart();
-        res.column = 0;
         text.foreach(res.index, &res, struct {
             fn each(loc: *Location, i: usize, c: u8) error{Break}!void {
                 if (c == '\n') {
@@ -180,28 +182,67 @@ pub const Location = struct {
                 }
             }
         }.each) catch {
-            return res;
+            const column = res.column;
+            res.column = 0;
+            return res.moveToColumn(column, text);
         };
 
-        res.column = text.len() - res.index;
-        res.index = text.len();
         return res.moveForwardTo(text.len(), text);
     }
 
     /// Get the index of the line this location is on.
-    pub fn lineStart(loc: Location) usize {
-        return loc.index - loc.column;
+    pub fn lineStart(loc: Location, text: Text.Content) usize {
+        var res: usize = loc.index;
+        while (res != 0 and text.at(res - 1) != '\n') : (res -= 1) {}
+        return res;
     }
 
-    /// Get the length of the line this location is on.
+    /// Get the length of the line this location is on (lenght in utf8 codepoints).
     pub fn lineLen(loc: Location, text: Text.Content) usize {
-        var res: usize = 0;
-        var it = text.iterator(loc.lineStart());
-        while (it.next()) |c| : (res += 1) {
+        const start = loc.lineStart(text);
+        var end: usize = loc.index;
+        var it = text.iterator(loc.index);
+        while (it.next()) |c| : (end += 1) {
             if (c == '\n')
                 break;
         }
 
+        return calcColumn(start, end, text);
+    }
+
+    fn calcColumn(start: usize, index: usize, text: Text.Content) usize {
+        var it = text.iterator(start);
+        var i: usize = start;
+        var res: usize = 0;
+        while (i < index) : (res += 1) {
+            const char = it.next() orelse break;
+
+            // TODO: Assumes fully valid UTF8
+            var len = unicode.utf8ByteSequenceLength(char) catch 1;
+            i += len;
+            while (len - 1 != 0) : (len -= 1)
+                _ = it.next();
+        }
+
+        return res;
+    }
+
+    pub fn moveToColumn(loc: Location, column: usize, text: Text.Content) Location {
+        var res = loc;
+        var it = text.iterator(res.index);
+        while (res.column < column) : (res.column += 1) {
+            const char = it.next() orelse break;
+            if (char == '\n')
+                break;
+
+            // TODO: Assumes fully valid UTF8
+            var len = unicode.utf8ByteSequenceLength(char) catch 1;
+            res.index += len;
+            while (len - 1 != 0) : (len -= 1)
+                debug.assert((it.next() orelse '\x00') != '\n');
+        }
+
+        res.column = column;
         return res;
     }
 };
@@ -271,23 +312,9 @@ pub const Cursor = struct {
                     break :blk;
                 }
 
-                const col = ptr.column;
                 ptr.* = ptr.moveBackwardToLine(ptr.line - amount, text);
-                debug.assert(ptr.column == 0);
-
-                ptr.column = math.min(ptr.lineLen(text), col);
-                ptr.index += ptr.column;
             },
-            .Down => blk: {
-                const col = ptr.column;
-                ptr.* = ptr.moveForwardToLine(ptr.line + amount, text);
-                if (ptr.index == text.len())
-                    break :blk;
-
-                debug.assert(ptr.column == 0);
-                ptr.column = math.min(ptr.lineLen(text), col);
-                ptr.index += ptr.column;
-            },
+            .Down => ptr.* = ptr.moveForwardToLine(ptr.line + amount, text),
             .Left => ptr.* = ptr.moveBackwardTo(math.sub(usize, ptr.index, amount) catch 0, text),
             .Right => {
                 const index = math.add(usize, ptr.index, amount) catch math.maxInt(usize);

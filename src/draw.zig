@@ -1,5 +1,4 @@
 const std = @import("std");
-
 const core = @import("core.zig");
 const terminal = @import("terminal.zig");
 const vt100 = @import("vt100.zig");
@@ -428,14 +427,17 @@ pub const TextView = struct {
         const content = view.text.content;
         const main_cursor_loc = view.text.mainCursor().index;
 
+        const line_len = main_cursor_loc.lineLen(view.text.content);
+        const main_column = math.min(line_len, main_cursor_loc.column);
+
         // If cursor moved out of the left of the screen, adjust screen
         // left to the cursors column.
-        view.column = math.min(view.column, main_cursor_loc.column);
+        view.column = math.min(view.column, main_column);
 
         // If cursor moved out of the right of the screen, adjust screen
         // right until cursor is on the last visable column.
         const last_visable_column = math.sub(usize, text_size.width, 1) catch 0;
-        const new_start_column = math.sub(usize, main_cursor_loc.column, last_visable_column) catch 0;
+        const new_start_column = math.sub(usize, main_column, last_visable_column) catch 0;
         view.column = math.max(view.column, new_start_column);
 
         // If cursor moved out of the top of the screen, adjust screen
@@ -451,7 +453,7 @@ pub const TextView = struct {
 
         // Get the new line location of the screen.
         view.line_loc = main_cursor_loc.moveToLine(line, content);
-        view.line_loc.index = view.line_loc.lineStart();
+        view.line_loc.index = view.line_loc.lineStart(view.text.content);
         view.line_loc.column = 0;
     }
 
@@ -878,10 +880,7 @@ pub const Terminal = struct {
         var curr_line = first_line;
         outer: while (curr_line.line - first_line.line < term_size.height) : (curr_line = curr_line.nextLine(text.content)) {
             const i = curr_line.line - first_line.line;
-            const move_to = math.min(curr_line.index + view.column, text.content.len());
-            const start = curr_line.moveForwardTo(move_to, text.content);
-            if (start.line != curr_line.line)
-                continue;
+            const start = curr_line.moveToColumn(view.column, text.content);
 
             const cells = new_term.line(i);
             var it = text.content.iterator(start.index);
@@ -894,7 +893,14 @@ pub const Terminal = struct {
                 if (c == '\n')
                     continue :outer;
 
-                cells[j].char = c;
+                // TODO: Assumes valid Utf8
+                const len = unicode.utf8ByteSequenceLength(c) catch 1;
+                var buf: [4]u8 = undefined;
+                buf[0] = c;
+                for (buf[1..len]) |*char|
+                    char.* = it.next() orelse 0;
+
+                cells[j].char = unicode.utf8Decode(buf[0..len]) catch '?';
             }
         }
 
@@ -914,8 +920,9 @@ pub const Terminal = struct {
 
             if (loc_start.index == loc_end.index) {
                 // Draw an '_' if the cursor does not select anything.
+                const real_column = math.min(loc_start.lineLen(text.content), loc_start.column);
                 const l = math.sub(usize, loc_start.line, view.line_loc.line) catch continue;
-                const c = math.sub(usize, loc_start.column, view.column) catch continue;
+                const c = math.sub(usize, real_column, view.column) catch continue;
                 if (term_size.height <= l or term_size.width <= c)
                     continue;
 
@@ -923,24 +930,32 @@ pub const Terminal = struct {
                 cells[c].attributes = .Underscore;
             } else {
                 var line_loc = if (loc_start.index < view.line_loc.index) view.line_loc else loc_start;
-                while (line_loc.line <= loc_end.line and line_loc.index < loc_end.index) : (line_loc = line_loc.nextLine(text.content)) {
+                while (line_loc.line <= loc_end.line) : ({
+                    line_loc = line_loc.nextLine(text.content);
+                    line_loc.index = line_loc.lineStart(text.content);
+                    line_loc.column = 0;
+                }) {
                     const l = math.sub(usize, line_loc.line, view.line_loc.line) catch continue;
                     if (term_size.height <= l)
                         break;
 
                     // Draw selection to end of line if we are not one the same
                     // line as loc_end
+                    const line_len = line_loc.lineLen(text.content);
                     const loc_end_column = if (line_loc.line == loc_end.line)
-                        loc_end.column
+                        math.min(line_len, loc_end.column)
                     else
-                        line_loc.lineLen(text.content) + 1;
-                    const start = math.sub(usize, line_loc.column, view.column) catch 0;
+                        line_len + 1;
+                    const start = math.sub(usize, math.min(line_len, line_loc.column), view.column) catch 0;
                     const end = math.sub(usize, loc_end_column, view.column) catch 0;
 
                     const real_end = math.min(term_size.width, end);
                     const cells = new_term.line(l);
                     for (cells[start..real_end]) |*cell|
                         cell.attributes = .Negative;
+
+                    if (line_loc.line == loc_end.line)
+                        break;
                 }
             }
         }
@@ -1524,6 +1539,52 @@ test "textView" {
         foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
         &textView(true, text),
     );
+
+
+    text = try text.moveCursors(1, .Index, .Up);
+    text = try text.moveCursors(40, .Both, .Right);
+    text = try text.moveCursors(1, .Both, .Down);
+    testDraw(
+        "ABCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklmno\r\n" ++
+        ":" ++ attri("4", " ") ++ "                                      \r\n" ++
+        "                                        \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       " ++ full_reset,
+        &textView(false, text),
+    );
+    testDraw(
+        foreg("90", "1") ++ " ABCDEFGHIJKLMNOPQRSTUVWYZabcdefghijklm\r\n" ++
+        foreg("90", "2") ++ " :" ++ attri("4", " ") ++ "                                    \r\n" ++
+        foreg("90", "3") ++ "                                       \r\n" ++
+        foreg("90", "4") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "5") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
+        &textView(true, text),
+    );
+
+    text = try core.Text.fromString(&fba.allocator, "\nss");
+    text = try text.moveCursors(100, .Both, .Right);
+    text = try text.moveCursors(1, .Index, .Up);
+    testDraw(
+        attri("7", " ") ++ "                                       \r\n" ++
+        attri("7", "ss") ++ "                                      \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       \r\n" ++
+        foreg("90", "~") ++ "                                       " ++ full_reset,
+        &textView(false, text),
+    );
+    testDraw(
+        foreg("90", "1") ++ " " ++ attri("7", " ") ++ "                                     \r\n" ++
+        foreg("90", "2") ++ " " ++ attri("7", "ss") ++ "                                    \r\n" ++
+        foreg("90", "3") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "4") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "5") ++ " " ++ foreg("90", "~") ++ "                                     \r\n" ++
+        foreg("90", "6") ++ " " ++ foreg("90", "~") ++ "                                     " ++ full_reset,
+        &textView(true, text),
+    );
+
 }
 
 // zig fmt: on
