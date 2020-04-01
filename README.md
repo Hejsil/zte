@@ -11,7 +11,7 @@ Things I remember about this editor:
   [here](https://github.com/Hejsil/zte/blob/master/src/core/list.zig)).
   * This editor currently just leaks all its memory. The idea was to
     implement some manual garbage collector where the implementer would
-    have to tag memory as alive themself and them they could run it
+    have to tag memory as alive themself and then they could run it
     to clean up the rest.
 * There is also a terminal [UI *framework*](https://github.com/Hejsil/zte/blob/master/src/draw.zig)
   in there that allows programmers
