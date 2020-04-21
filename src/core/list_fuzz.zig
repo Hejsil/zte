@@ -278,9 +278,9 @@ fn fuzz(allocator: *mem.Allocator, comptime node_size: usize, max_slice_size: us
             },
             .AppendList => {
                 try stream.print("    l = try l.appendList(l);\n");
-                try stream.print("    try cmp.appendSlice(cmp.toSlice());\n");
+                try stream.print("    try cmp.appendSlice(cmp.items);\n");
                 l = try l.appendList(l);
-                try cmp.appendSlice(cmp.toSlice());
+                try cmp.appendSlice(cmp.items);
             },
             .Insert => |insert| {
                 try stream.print("    l = try l.insert({}, '{c}');\n", insert.index, insert.item);
@@ -296,7 +296,7 @@ fn fuzz(allocator: *mem.Allocator, comptime node_size: usize, max_slice_size: us
             },
             //.InsertList => |index| {
             //    l = try l.insertList(index, l);
-            //    try cmp.insertSlice(index, cmp.toSlice());
+            //    try cmp.insertSlice(index, cmp.items);
             //},
             .Remove => |remove| {
                 try stream.print("    l = try l.remove({});\n", remove);
@@ -329,7 +329,7 @@ fn fuzz(allocator: *mem.Allocator, comptime node_size: usize, max_slice_size: us
             },
         }
 
-        try stream.print("    try testList(l, cmp.toSlice());\n\n");
-        try testList(l, cmp.toSlice());
+        try stream.print("    try testList(l, cmp.items);\n\n");
+        try testList(l, cmp.items);
     }
 }

@@ -14,7 +14,7 @@ pub fn build(b: *Builder) void {
     exe.setBuildMode(mode);
     exe.linkSystemLibrary("c");
 
-    const fmt_step = b.addFmt([_][]const u8{
+    const fmt_step = b.addFmt(&[_][]const u8{
         "build.zig",
         "src",
     });

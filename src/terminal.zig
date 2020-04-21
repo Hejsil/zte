@@ -10,7 +10,7 @@ const mem = std.mem;
 var old_tc_attr: ?c.termios = null;
 
 pub fn clear(stream: var) !void {
-    try stream.write(vt100.erase.inDisplay(vt100.erase.all) ++ vt100.cursor.position(""));
+    try stream.writeAll(vt100.erase.inDisplay(vt100.erase.all) ++ vt100.cursor.position(""));
 }
 
 pub fn init(stdin: fs.File) !void {
@@ -37,7 +37,7 @@ pub fn size(stdout: fs.File, stdin: fs.File) !Size {
         // TODO: We sould probably restore the cursor position when we are done.
         //       This program doesn't require that this is done, but if someone
         //       copy pastes this, then they probably want that behavior.
-        try stdout.write(vt100.cursor.forward("999") ++ vt100.cursor.down("999"));
+        try stdout.writeAll(vt100.cursor.forward("999") ++ vt100.cursor.down("999"));
         const pos = try cursorPosition(stdout, stdin);
         return Size{
             .columns = pos.x,
@@ -57,12 +57,12 @@ pub const Pos = struct {
 };
 
 pub fn cursorPosition(stdout: fs.File, stdin: fs.File) !Pos {
-    try stdout.write(vt100.device.statusReport(vt100.device.request.active_position));
+    try stdout.writeAll(vt100.device.statusReport(vt100.device.request.active_position));
 
     var buf: [1024]u8 = undefined;
     var len: usize = 0;
     while (len < buf.len) : (len += 1) {
-        const l = try stdin.read((*[1]u8)(&buf[len]));
+        const l = try stdin.read(buf[len .. len + 1]);
         if (l != 1 or buf[len] == 'R')
             break;
     }
@@ -73,7 +73,7 @@ pub fn cursorPosition(stdout: fs.File, stdin: fs.File) !Pos {
     if (!mem.eql(u8, vt100.escape, buf[0..vt100.escape.len]))
         return error.CursorPosition;
 
-    var iter = mem.separate(buf[vt100.escape.len..len], ";");
+    var iter = mem.split(buf[vt100.escape.len..len], ";");
     const rows_str = iter.next() orelse return error.CursorPosition;
     const cols_str = iter.next() orelse return error.CursorPosition;
     if (iter.next()) |_|
@@ -87,10 +87,10 @@ pub fn cursorPosition(stdout: fs.File, stdin: fs.File) !Pos {
 
 fn enableRawMode(file: fs.File) !void {
     var raw = try getAttr(file);
-    raw.c_iflag &= ~@typeOf(raw.c_lflag)(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    raw.c_oflag &= ~@typeOf(raw.c_lflag)(c.OPOST);
-    raw.c_cflag &= ~@typeOf(raw.c_lflag)(c.CS8);
-    raw.c_lflag &= ~@typeOf(raw.c_lflag)(c.ECHO | c.ICANON | c.IEXTEN | c.ISIG);
+    raw.c_iflag &= ~@as(@TypeOf(raw.c_lflag), BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~@as(@TypeOf(raw.c_lflag), c.OPOST);
+    raw.c_cflag &= ~@as(@TypeOf(raw.c_lflag), c.CS8);
+    raw.c_lflag &= ~@as(@TypeOf(raw.c_lflag), c.ECHO | c.ICANON | c.IEXTEN | c.ISIG);
     raw.c_cc[c.VMIN] = 0;
     raw.c_cc[c.VTIME] = 1;
     try setAttr(file, raw);

@@ -106,16 +106,16 @@ pub const Key = struct {
     };
 
     /// Returns null terminated array
-    pub fn toStr(key: Key.Type, pick: Pick) [32]u8 {
+    pub fn toStr(key: Key.Type, pick: Pick) [32:0]u8 {
         if (key == Key.unknown)
-            return "???\x00" ++ ([28]u8)(undefined);
+            return ("???" ++ ("\x00" ** 29)).*;
         const modi_str = switch (key & alt) {
             alt => "alt+",
             else => "",
         };
 
         var utf8_buf: [4]u8 = undefined;
-        const key_no_modi = key & ~Type(alt);
+        const key_no_modi = key & ~@as(Type, alt);
         const key_str = switch (key_no_modi) {
             f1 => "f1",
             f2 => "f2",
@@ -220,16 +220,15 @@ pub const Key = struct {
             else => blk: {
                 if ((key & 0xffffffff00000000) != 0)
                     break :blk "???";
-                const codepoint = @intCast(u32, key & 0x00000000ffffffff);
+                const codepoint = @intCast(u21, key & 0x00000000ffffffff);
                 const len = unicode.utf8Encode(codepoint, &utf8_buf) catch unreachable;
-                break :blk ([]const u8)(utf8_buf[0..len]);
+                break :blk utf8_buf[0..len];
             },
         };
 
-        var res: [32]u8 = undefined;
+        var res = ("\x00" ** 32).*;
         mem.copy(u8, res[0..], modi_str);
         mem.copy(u8, res[modi_str.len..], key_str);
-        mem.copy(u8, res[modi_str.len + key_str.len ..], "\x00");
         return res;
     }
 };
@@ -280,10 +279,10 @@ fn parseKey(key: []const u8) Key.Type {
         return Key.alt | parseKey(key[1..]);
     }
 
-    if (key[0] <= (Key.space & ~Key.Type(Key.ctrl)))
-        return Key.ctrl | Key.Type(key[0]);
-    if (key[0] == (Key.backspace2 & ~Key.Type(Key.ctrl)))
-        return Key.ctrl | Key.Type(key[0]);
+    if (key[0] <= (Key.space & ~@as(Key.Type, Key.ctrl)))
+        return Key.ctrl | @as(Key.Type, key[0]);
+    if (key[0] == (Key.backspace2 & ~@as(Key.Type, Key.ctrl)))
+        return Key.ctrl | @as(Key.Type, key[0]);
 
     const len = unicode.utf8ByteSequenceLength(key[0]) catch return Key.unknown;
     if (key.len <= len)

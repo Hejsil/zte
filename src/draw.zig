@@ -96,8 +96,8 @@ pub fn Stack(comptime Children: type) type {
     };
 }
 
-pub fn stack(orientation: Orientation, children: var) Stack(@typeOf(children)) {
-    return Stack(@typeOf(children)){
+pub fn stack(orientation: Orientation, children: var) Stack(@TypeOf(children)) {
+    return Stack(@TypeOf(children)){
         .orientation = orientation,
         .children = children,
     };
@@ -131,8 +131,8 @@ pub fn Float(comptime Children: type) type {
     };
 }
 
-pub fn float(children: var) Float(@typeOf(children)) {
-    return Float(@typeOf(children)){
+pub fn float(children: var) Float(@TypeOf(children)) {
+    return Float(@TypeOf(children)){
         .children = children,
     };
 }
@@ -155,7 +155,7 @@ pub const Label = struct {
 
     pub fn range(t: @This()) Range {
         var res = Size{};
-        var it = mem.separate(t.str, "\n");
+        var it = mem.split(t.str, "\n");
         while (it.next()) |line| : (res.height += 1) {
             var line_len: usize = 0;
             var i: usize = 0;
@@ -188,8 +188,8 @@ pub fn Int(comptime format: IntFormat) type {
         int: int_format.Int,
 
         pub fn range(i: @This()) Range {
-            var cos = io.CountingOutStream(io.NullOutStream.Error).init(io.null_out_stream);
-            cos.stream.print("{" ++ int_format.format ++ "}", i.int) catch unreachable;
+            var cos = io.countingOutStream(io.null_out_stream);
+            cos.outStream().print("{" ++ int_format.format ++ "}", .{i.int}) catch unreachable;
             return Range.fixed(Size{
                 .height = 1,
                 .width = cos.bytes_written,
@@ -199,10 +199,10 @@ pub fn Int(comptime format: IntFormat) type {
 }
 
 pub fn int(comptime format: []const u8, i: var) Int(IntFormat{
-    .Int = @typeOf(i),
+    .Int = @TypeOf(i),
     .format = format,
 }) {
-    return Int(IntFormat{ .Int = @typeOf(i), .format = format }){
+    return Int(IntFormat{ .Int = @TypeOf(i), .format = format }){
         .int = i,
     };
 }
@@ -220,15 +220,15 @@ pub fn Value(comptime format: ValueFormat) type {
 
         pub fn range(v: @This()) Range {
             var buf: [1024 * 8]u8 = undefined;
-            const str = fmt.bufPrint(&buf, "{" ++ value_format.format ++ "}", v.value) catch unreachable;
+            const str = fmt.bufPrint(&buf, "{" ++ value_format.format ++ "}", .{v.value}) catch unreachable;
             const label_view = label(.Left, str);
             return label_view.range();
         }
     };
 }
 
-pub fn value(comptime format: []const u8, v: var) Value(ValueFormat{ .Type = @typeOf(v), .format = format }) {
-    return Value(ValueFormat{ .Type = @typeOf(v), .format = format }){
+pub fn value(comptime format: []const u8, v: var) Value(ValueFormat{ .Type = @TypeOf(v), .format = format }) {
+    return Value(ValueFormat{ .Type = @TypeOf(v), .format = format }){
         .value = v,
     };
 }
@@ -245,8 +245,8 @@ pub fn Center(comptime Child: type) type {
     };
 }
 
-pub fn center(child: var) Center(@typeOf(child)) {
-    return Center(@typeOf(child)){ .child = child };
+pub fn center(child: var) Center(@TypeOf(child)) {
+    return Center(@TypeOf(child)){ .child = child };
 }
 
 fn RightResult(comptime T: type) type {
@@ -256,8 +256,8 @@ fn RightResult(comptime T: type) type {
     });
 }
 
-pub fn right(child: var) RightResult(@typeOf(child)) {
-    const Result = RightResult(@typeOf(child));
+pub fn right(child: var) RightResult(@TypeOf(child)) {
+    const Result = RightResult(@TypeOf(child));
 
     var range = Range.flexible(Size{});
     range.max.height = 0;
@@ -280,8 +280,8 @@ pub fn Background(comptime Child: type) type {
     };
 }
 
-pub fn background(color: Terminal.Color, child: var) Background(@typeOf(child)) {
-    return Background(@typeOf(child)){
+pub fn background(color: Terminal.Color, child: var) Background(@TypeOf(child)) {
+    return Background(@TypeOf(child)){
         .child = child,
         .background = color,
     };
@@ -300,8 +300,8 @@ pub fn Foreground(comptime Child: type) type {
     };
 }
 
-pub fn foreground(color: Terminal.Color, child: var) Foreground(@typeOf(child)) {
-    return Foreground(@typeOf(child)){
+pub fn foreground(color: Terminal.Color, child: var) Foreground(@TypeOf(child)) {
+    return Foreground(@TypeOf(child)){
         .child = child,
         .foreground = color,
     };
@@ -320,8 +320,8 @@ pub fn Attributes(comptime Child: type) type {
     };
 }
 
-pub fn attributes(attr: Terminal.Attribute, child: var) Attributes(@typeOf(child)) {
-    return Attributes(@typeOf(child)){
+pub fn attributes(attr: Terminal.Attribute, child: var) Attributes(@TypeOf(child)) {
+    return Attributes(@TypeOf(child)){
         .child = child,
         .attributes = attr,
     };
@@ -339,8 +339,8 @@ pub fn Clear(comptime Child: type) type {
     };
 }
 
-pub fn clear(child: var) Clear(@typeOf(child)) {
-    return Clear(@typeOf(child)){
+pub fn clear(child: var) Clear(@TypeOf(child)) {
+    return Clear(@TypeOf(child)){
         .child = child,
     };
 }
@@ -366,8 +366,8 @@ pub fn Visible(comptime Child: type) type {
     };
 }
 
-pub fn visible(visibility: Visibility, child: var) Visible(@typeOf(child)) {
-    return Visible(@typeOf(child)){
+pub fn visible(visibility: Visibility, child: var) Visible(@TypeOf(child)) {
+    return Visible(@TypeOf(child)){
         .visibility = visibility,
         .child = child,
     };
@@ -390,8 +390,8 @@ pub fn Box(comptime Child: type) type {
     };
 }
 
-pub fn box(child: var) Box(@typeOf(child)) {
-    return Box(@typeOf(child)){
+pub fn box(child: var) Box(@TypeOf(child)) {
+    return Box(@TypeOf(child)){
         .child = child,
     };
 }
@@ -409,8 +409,8 @@ pub fn CustomRange(comptime Child: type) type {
     };
 }
 
-pub fn customRange(range: Range, child: var) CustomRange(@typeOf(child)) {
-    return CustomRange(@typeOf(child)){
+pub fn customRange(range: Range, child: var) CustomRange(@TypeOf(child)) {
+    return CustomRange(@TypeOf(child)){
         .r = range,
         .child = child,
     };
@@ -476,12 +476,12 @@ fn digits(n: var) usize {
 }
 
 test "digits" {
-    testing.expectEqual(usize(1), digits(usize(0)));
-    testing.expectEqual(usize(1), digits(usize(9)));
-    testing.expectEqual(usize(2), digits(usize(10)));
-    testing.expectEqual(usize(2), digits(usize(99)));
-    testing.expectEqual(usize(3), digits(usize(100)));
-    testing.expectEqual(usize(3), digits(usize(999)));
+    testing.expectEqual(@as(usize, 1), digits(@as(usize, 0)));
+    testing.expectEqual(@as(usize, 1), digits(@as(usize, 9)));
+    testing.expectEqual(@as(usize, 2), digits(@as(usize, 10)));
+    testing.expectEqual(@as(usize, 2), digits(@as(usize, 99)));
+    testing.expectEqual(@as(usize, 3), digits(@as(usize, 100)));
+    testing.expectEqual(@as(usize, 3), digits(@as(usize, 999)));
 }
 
 pub const Terminal = struct {
@@ -490,14 +490,14 @@ pub const Terminal = struct {
         y: usize = 0,
     };
 
-    cells: []Cell = ([*]Cell)(undefined)[0..0],
+    cells: []Cell = &[_]Cell{},
     cell_size: Size = Size{},
     allocator: *mem.Allocator,
     top_left: Pos = Pos{},
     bot_right: Pos = Pos{},
 
     const Cell = struct {
-        char: u32 = ' ',
+        char: u21 = ' ',
         foreground: Color = .Reset,
         background: Color = .Reset,
         attributes: Attribute = .Reset,
@@ -553,7 +553,7 @@ pub const Terminal = struct {
     }
 
     pub fn draw(term: Terminal, view: var) void {
-        const V = @typeOf(view).Child;
+        const V = @TypeOf(view).Child;
         const term_size = term.size();
         const view_range = view.range();
         var new = term;
@@ -608,7 +608,7 @@ pub const Terminal = struct {
     fn drawLabel(term: Terminal, view: Label) void {
         const term_size = term.size();
         var l: usize = 0;
-        var it = mem.separate(view.str, "\n");
+        var it = mem.split(view.str, "\n");
         while (it.next()) |line_str| : (l += 1) {
             if (term_size.height <= l)
                 break;
@@ -656,14 +656,14 @@ pub const Terminal = struct {
 
     fn drawInt(term: Terminal, view: var) void {
         var buf: [1024]u8 = undefined;
-        const str = fmt.bufPrint(&buf, "{" ++ @typeOf(view).int_format.format ++ "}", view.int) catch unreachable;
+        const str = fmt.bufPrint(&buf, "{" ++ @TypeOf(view).int_format.format ++ "}", .{view.int}) catch unreachable;
         const label_view = label(.Left, str);
         term.draw(&label_view);
     }
 
     fn drawValue(term: Terminal, view: var) void {
         var buf: [1024 * 8]u8 = undefined;
-        const str = fmt.bufPrint(&buf, "{" ++ @typeOf(view).value_format.format ++ "}", view.value) catch unreachable;
+        const str = fmt.bufPrint(&buf, "{" ++ @TypeOf(view).value_format.format ++ "}", .{view.value}) catch unreachable;
         const label_view = label(.Left, str);
         term.draw(&label_view);
     }
@@ -676,7 +676,7 @@ pub const Terminal = struct {
     }
 
     fn drawStackHelper(term: Terminal, view: var, comptime orientation: Orientation) void {
-        const children = switch (@typeInfo(@typeOf(view).Child.Id)) {
+        const children = switch (@typeInfo(@TypeOf(view).Child.Id)) {
             .Pointer => |ptr| @typeInfo(ptr.child_type).Struct.fields,
             .Struct => |s| s.fields,
             else => @compileError("TODO: Handle array and slice here too"),
@@ -728,7 +728,7 @@ pub const Terminal = struct {
     }
 
     fn drawFloat(term: Terminal, view: var) void {
-        const children = switch (@typeInfo(@typeOf(view).Child.Id)) {
+        const children = switch (@typeInfo(@TypeOf(view).Child.Id)) {
             .Pointer => |ptr| @typeInfo(ptr.child_type).Struct.fields,
             .Struct => |s| s.fields,
             else => @compileError("TODO: Handle array and slice here too"),
@@ -999,13 +999,13 @@ pub const Terminal = struct {
 
                 var buf: [4]u8 = undefined;
                 const len = try unicode.utf8Encode(cell.char, &buf);
-                try stream.write(buf[0..len]);
+                try stream.writeAll(buf[0..len]);
             }
 
             // Don't output a newline on the last line. That would create and empty
             // line at the buttom of the terminal
             if (i + 1 != term.cell_size.height)
-                try stream.write("\r\n");
+                try stream.writeAll("\r\n");
         }
 
         try setAttr(stream, .Reset);
@@ -1015,55 +1015,55 @@ pub const Terminal = struct {
 
     fn setForeground(stream: var, color: Color) !void {
         switch (color) {
-            .Reset => try stream.write(vt100.selectGraphicRendition("39")),
-            .Black => try stream.write(vt100.selectGraphicRendition("30")),
-            .Red => try stream.write(vt100.selectGraphicRendition("31")),
-            .Green => try stream.write(vt100.selectGraphicRendition("32")),
-            .Yellow => try stream.write(vt100.selectGraphicRendition("33")),
-            .Blue => try stream.write(vt100.selectGraphicRendition("34")),
-            .Magenta => try stream.write(vt100.selectGraphicRendition("35")),
-            .Cyan => try stream.write(vt100.selectGraphicRendition("36")),
-            .White => try stream.write(vt100.selectGraphicRendition("37")),
-            .BrightBlack => try stream.write(vt100.selectGraphicRendition("90")),
-            .BrightRed => try stream.write(vt100.selectGraphicRendition("91")),
-            .BrightGreen => try stream.write(vt100.selectGraphicRendition("92")),
-            .BrightYellow => try stream.write(vt100.selectGraphicRendition("93")),
-            .BrightBlue => try stream.write(vt100.selectGraphicRendition("94")),
-            .BrightMagenta => try stream.write(vt100.selectGraphicRendition("95")),
-            .BrightCyan => try stream.write(vt100.selectGraphicRendition("96")),
-            .BrightWhite => try stream.write(vt100.selectGraphicRendition("97")),
+            .Reset => try stream.writeAll(vt100.selectGraphicRendition("39")),
+            .Black => try stream.writeAll(vt100.selectGraphicRendition("30")),
+            .Red => try stream.writeAll(vt100.selectGraphicRendition("31")),
+            .Green => try stream.writeAll(vt100.selectGraphicRendition("32")),
+            .Yellow => try stream.writeAll(vt100.selectGraphicRendition("33")),
+            .Blue => try stream.writeAll(vt100.selectGraphicRendition("34")),
+            .Magenta => try stream.writeAll(vt100.selectGraphicRendition("35")),
+            .Cyan => try stream.writeAll(vt100.selectGraphicRendition("36")),
+            .White => try stream.writeAll(vt100.selectGraphicRendition("37")),
+            .BrightBlack => try stream.writeAll(vt100.selectGraphicRendition("90")),
+            .BrightRed => try stream.writeAll(vt100.selectGraphicRendition("91")),
+            .BrightGreen => try stream.writeAll(vt100.selectGraphicRendition("92")),
+            .BrightYellow => try stream.writeAll(vt100.selectGraphicRendition("93")),
+            .BrightBlue => try stream.writeAll(vt100.selectGraphicRendition("94")),
+            .BrightMagenta => try stream.writeAll(vt100.selectGraphicRendition("95")),
+            .BrightCyan => try stream.writeAll(vt100.selectGraphicRendition("96")),
+            .BrightWhite => try stream.writeAll(vt100.selectGraphicRendition("97")),
         }
     }
 
     fn setBackground(stream: var, color: Color) !void {
         switch (color) {
-            .Reset => try stream.write(vt100.selectGraphicRendition("49")),
-            .Black => try stream.write(vt100.selectGraphicRendition("40")),
-            .Red => try stream.write(vt100.selectGraphicRendition("41")),
-            .Green => try stream.write(vt100.selectGraphicRendition("42")),
-            .Yellow => try stream.write(vt100.selectGraphicRendition("43")),
-            .Blue => try stream.write(vt100.selectGraphicRendition("44")),
-            .Magenta => try stream.write(vt100.selectGraphicRendition("45")),
-            .Cyan => try stream.write(vt100.selectGraphicRendition("46")),
-            .White => try stream.write(vt100.selectGraphicRendition("47")),
-            .BrightBlack => try stream.write(vt100.selectGraphicRendition("100")),
-            .BrightRed => try stream.write(vt100.selectGraphicRendition("101")),
-            .BrightGreen => try stream.write(vt100.selectGraphicRendition("102")),
-            .BrightYellow => try stream.write(vt100.selectGraphicRendition("103")),
-            .BrightBlue => try stream.write(vt100.selectGraphicRendition("104")),
-            .BrightMagenta => try stream.write(vt100.selectGraphicRendition("105")),
-            .BrightCyan => try stream.write(vt100.selectGraphicRendition("106")),
-            .BrightWhite => try stream.write(vt100.selectGraphicRendition("107")),
+            .Reset => try stream.writeAll(vt100.selectGraphicRendition("49")),
+            .Black => try stream.writeAll(vt100.selectGraphicRendition("40")),
+            .Red => try stream.writeAll(vt100.selectGraphicRendition("41")),
+            .Green => try stream.writeAll(vt100.selectGraphicRendition("42")),
+            .Yellow => try stream.writeAll(vt100.selectGraphicRendition("43")),
+            .Blue => try stream.writeAll(vt100.selectGraphicRendition("44")),
+            .Magenta => try stream.writeAll(vt100.selectGraphicRendition("45")),
+            .Cyan => try stream.writeAll(vt100.selectGraphicRendition("46")),
+            .White => try stream.writeAll(vt100.selectGraphicRendition("47")),
+            .BrightBlack => try stream.writeAll(vt100.selectGraphicRendition("100")),
+            .BrightRed => try stream.writeAll(vt100.selectGraphicRendition("101")),
+            .BrightGreen => try stream.writeAll(vt100.selectGraphicRendition("102")),
+            .BrightYellow => try stream.writeAll(vt100.selectGraphicRendition("103")),
+            .BrightBlue => try stream.writeAll(vt100.selectGraphicRendition("104")),
+            .BrightMagenta => try stream.writeAll(vt100.selectGraphicRendition("105")),
+            .BrightCyan => try stream.writeAll(vt100.selectGraphicRendition("106")),
+            .BrightWhite => try stream.writeAll(vt100.selectGraphicRendition("107")),
         }
     }
 
     fn setAttr(stream: var, attr: Attribute) !void {
         switch (attr) {
-            .Reset => try stream.write(vt100.selectGraphicRendition("0")),
-            .Bold => try stream.write(vt100.selectGraphicRendition("1")),
-            .Underscore => try stream.write(vt100.selectGraphicRendition("4")),
-            .Blink => try stream.write(vt100.selectGraphicRendition("5")),
-            .Negative => try stream.write(vt100.selectGraphicRendition("7")),
+            .Reset => try stream.writeAll(vt100.selectGraphicRendition("0")),
+            .Bold => try stream.writeAll(vt100.selectGraphicRendition("1")),
+            .Underscore => try stream.writeAll(vt100.selectGraphicRendition("4")),
+            .Blink => try stream.writeAll(vt100.selectGraphicRendition("5")),
+            .Negative => try stream.writeAll(vt100.selectGraphicRendition("7")),
         }
     }
 };
@@ -1138,7 +1138,7 @@ test "int" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &int("", isize(10)),
+        &int("", @as(isize, 10)),
     );
     testDraw(
         "-10                                     \r\n" ++
@@ -1147,7 +1147,7 @@ test "int" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &int("", isize(-10)),
+        &int("", @as(isize, -10)),
     );
     testDraw(
         "1MB                                     \r\n" ++
@@ -1156,7 +1156,7 @@ test "int" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &int("B", usize(1000 * 1000)),
+        &int("B", @as(usize, 1000 * 1000)),
     );
 }
 
@@ -1168,18 +1168,13 @@ test "value" {
         pub fn format(
             self: @This(),
             comptime form: []const u8,
-            comptime options: std.fmt.FormatOptions,
+            options: std.fmt.FormatOptions,
             context: var,
-            comptime Errors: type,
-            output: fn (@typeOf(context), []const u8) Errors!void,
-        ) Errors!void {
+        ) !void {
             return std.fmt.format(
                 context,
-                Errors,
-                output,
                 "{}  {}",
-                self.a,
-                self.b,
+                .{self.a, self.b },
             );
         }
     };
@@ -1269,7 +1264,7 @@ test "right" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &right(int("", usize(2))),
+        &right(int("", @as(usize, 2))),
     );
 }
 
@@ -1281,7 +1276,7 @@ test "visible" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &visible(.Show, int("B", usize(1000 * 1000))),
+        &visible(.Show, int("B", @as(usize, 1000 * 1000))),
     );
     testDraw(
         "                                        \r\n" ++
@@ -1290,7 +1285,7 @@ test "visible" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &visible(.Hide, int("B", usize(1000 * 1000))),
+        &visible(.Hide, int("B", @as(usize, 1000 * 1000))),
     );
 }
 
@@ -1302,7 +1297,7 @@ test "box" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &box(int("", usize(1000))),
+        &box(int("", @as(usize, 1000))),
     );
     testDraw(
         "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\r\n" ++
@@ -1311,7 +1306,7 @@ test "box" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &box(int("", u128(100000000000000000000000000000000000009))),
+        &box(int("", @as(u128, 100000000000000000000000000000000000009))),
     );
 }
 
@@ -1428,10 +1423,10 @@ test "float" {
         "                                        \r\n" ++
         "                                        \r\n" ++
         "                                        " ++ full_reset,
-        &float(struct {
-            _0: Label = label(.Left, "ABCD"),
-            _1: @typeOf(blank) = blank,
-        }{}),
+        &float(.{
+            ._0 = label(.Left, "ABCD"),
+            ._1 = blank,
+        }),
     );
 }
 
@@ -1589,15 +1584,15 @@ test "textView" {
 
 // zig fmt: on
 fn escape(allocator: *mem.Allocator, str: []const u8) ![]u8 {
-    var buffer = try std.Buffer.initSize(allocator, str.len);
-    var bos = std.io.BufferOutStream.init(&buffer);
+    var buffer = std.ArrayList(u8).init(allocator);
+    var bos = buffer.outStream();
     defer buffer.deinit();
 
     for (str) |c| {
         if (std.ascii.isPrint(c) or std.ascii.isSpace(c)) {
-            try bos.stream.writeByte(c);
+            try bos.writeByte(c);
         } else {
-            try bos.stream.print("\\x{x}", c);
+            try bos.print("\\x{x}", .{c});
         }
     }
 
@@ -1612,21 +1607,21 @@ fn testDraw(expect: []const u8, view: var) void {
     term.draw(view);
 
     var buf2: [1024 * 2]u8 = undefined;
-    var sos = io.SliceOutStream.init(&buf2);
-    term.output(&sos.stream) catch unreachable;
+    var sos = io.fixedBufferStream(&buf2);
+    term.output(sos.outStream()) catch unreachable;
 
     if (!mem.eql(u8, expect, sos.getWritten())) {
-        debug.warn("\n######## Expected ########\n");
-        debug.warn("len: {}\n", expect.len);
-        debug.warn("{}", expect);
-        debug.warn("\n######## Actual ########\n");
-        debug.warn("len: {}\n", sos.getWritten().len);
-        debug.warn("{}\n", sos.getWritten());
+        debug.warn("\n######## Expected ########\n", .{});
+        debug.warn("len: {}\n", .{expect.len});
+        debug.warn("{}", .{expect});
+        debug.warn("\n######## Actual ########\n", .{});
+        debug.warn("len: {}\n", .{sos.getWritten().len});
+        debug.warn("{}\n", .{sos.getWritten()});
 
-        debug.warn("######## Expected (escaped) ########\n");
-        debug.warn("{}\n", escape(&fba.allocator, expect) catch unreachable);
-        debug.warn("######## Actual (escaped) ########\n");
-        debug.warn("{}\n", escape(&fba.allocator, sos.getWritten()) catch unreachable);
+        debug.warn("######## Expected (escaped) ########\n", .{});
+        debug.warn("{}\n", .{escape(&fba.allocator, expect) catch unreachable});
+        debug.warn("######## Actual (escaped) ########\n", .{});
+        debug.warn("{}\n", .{escape(&fba.allocator, sos.getWritten()) catch unreachable});
         testing.expect(false);
     }
 }

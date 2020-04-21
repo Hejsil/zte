@@ -409,7 +409,7 @@ test "indent" {
     }) |case| {
         const allocator = &heap.FixedBufferAllocator.init(&buf).allocator;
         const t = try makeText(allocator, case.before).indent(case.indent, case.num);
-        expect(try std.fmt.allocPrint(allocator, "{} {}", case.indent, case.num), t, case.after);
+        expect(try std.fmt.allocPrint(allocator, "{} {}", .{ case.indent, case.num }), t, case.after);
     }
 }
 
@@ -425,23 +425,23 @@ test "cursor columns are consistent" {
     expect("", t, "aaa[]aaaaaaaaaaaaaa\nefg\nhij");
     t = try t.moveCursors(1, .Both, .Right);
     expect("", t, "aaaa[]aaaaaaaaaaaaa\nefg\nhij");
-    testing.expectEqual(usize(4), t.mainCursor().index.column);
-    testing.expectEqual(usize(4), t.mainCursor().selection.column);
+    testing.expectEqual(@as(usize, 4), t.mainCursor().index.column);
+    testing.expectEqual(@as(usize, 4), t.mainCursor().selection.column);
     t = try t.moveCursors(1, .Both, .Left);
     expect("", t, "aaa[]aaaaaaaaaaaaaa\nefg\nhij");
-    testing.expectEqual(usize(3), t.mainCursor().index.column);
-    testing.expectEqual(usize(3), t.mainCursor().selection.column);
+    testing.expectEqual(@as(usize, 3), t.mainCursor().index.column);
+    testing.expectEqual(@as(usize, 3), t.mainCursor().selection.column);
 }
 
 fn expect(str: []const u8, found: Text, e: []const u8) void {
     var buf: [1024 * 1024]u8 = undefined;
-    var sos = io.SliceOutStream.init(&buf);
-    printText(&sos.stream, found);
+    var sos = io.fixedBufferStream(&buf);
+    printText(sos.outStream(), found);
 
     if (!mem.eql(u8, e, sos.getWritten())) {
-        debug.warn("\nTest failed!!!\n");
-        debug.warn("########## Expect ##########\n{}\n", e);
-        debug.warn("########## Actual ##########\n{}\n", sos.getWritten());
+        debug.warn("\nTest failed!!!\n", .{});
+        debug.warn("########## Expect ##########\n{}\n", .{e});
+        debug.warn("########## Actual ##########\n{}\n", .{sos.getWritten()});
         @panic(str);
     }
 }
@@ -455,10 +455,10 @@ fn printText(stream: var, t: Text) void {
     for (cursors) |cursor| {
         const start = cursor.start().index;
         const end = cursor.end().index;
-        stream.print("{}[{}]", content[offset..start], content[start..end]) catch unreachable;
+        stream.print("{}[{}]", .{ content[offset..start], content[start..end] }) catch unreachable;
         offset = end;
     }
-    stream.print("{}", content[offset..]) catch unreachable;
+    stream.print("{}", .{content[offset..]}) catch unreachable;
 }
 
 // Creates 'Text' from a template string. '[' and ']' are used
@@ -469,7 +469,7 @@ fn makeText(allocator: *mem.Allocator, comptime str: []const u8) Text {
         end: usize,
     };
     comptime var t: []const u8 = "";
-    comptime var cursor_indexs: []const Indexs = [_]Indexs{};
+    comptime var cursor_indexs: []const Indexs = &[_]Indexs{};
     comptime {
         var offset: usize = 0;
         var tmp = str;
@@ -501,6 +501,6 @@ fn makeText(allocator: *mem.Allocator, comptime str: []const u8) Text {
     return Text{
         .allocator = allocator,
         .content = content,
-        .cursors = Cursors.fromSlice(allocator, cursors) catch unreachable,
+        .cursors = Cursors.fromSlice(allocator, &cursors) catch unreachable,
     };
 }

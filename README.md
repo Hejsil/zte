@@ -1,9 +1,8 @@
 # zte
 
 A terminal text editor written in Zig.
-I would love to show you a video, but this project doesn't compile.
-It was some old code I had lying around that I thought I might as well
-make public in case someone may find it useful.
+I'll try to keep this project building with the latest version of
+zig, but I do not really indend to work much more on this.
 
 Things I remember about this editor:
 * I was playing around with immutable data structures, so the entire editor
@@ -22,3 +21,6 @@ Things I remember about this editor:
   * There is also a terminal backend for this *framework*
 * It nearly has no dependencies, only relying on glibc for
   [2 functions](https://github.com/Hejsil/zte/blob/master/src/c.zig).
+
+![demo](demo.gif)
+

@@ -20,7 +20,7 @@ test "List.foreach" {
         l.foreach(i, &j, struct {
             fn each(expect_i: *usize, actual_i: usize, c: u8) error{}!void {
                 testing.expectEqual(expect_i.*, actual_i);
-                testing.expectEqual(u8('a'), c);
+                testing.expectEqual(@as(u8, 'a'), c);
                 expect_i.* += 1;
             }
         }.each) catch {};
@@ -37,11 +37,11 @@ test "fuzz case 3-128-2-580" {
     l = try CustomList(u8, 3).fromSlice(allocator, "dvtusjjmqsiojhglereivjnhkdvyeqdjtcutufsezllzjrmupifivylniljdjyfioyboualnynwiygddjgtfpkod");
     try cmp.resize(0);
     try cmp.appendSlice("dvtusjjmqsiojhglereivjnhkdvyeqdjtcutufsezllzjrmupifivylniljdjyfioyboualnynwiygddjgtfpkod");
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 
     l = try l.insertSlice(17, "wvcgqeluuybbenuiunnnrcdyvoqrmdinfwffgyryebafzauyzpwwlzuoirkxlyjqboyvtkbehondfnqhzdrsrhqfexyindwoop");
     try cmp.insertSlice(17, "wvcgqeluuybbenuiunnnrcdyvoqrmdinfwffgyryebafzauyzpwwlzuoirkxlyjqboyvtkbehondfnqhzdrsrhqfexyindwoop");
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 }
 
 test "fuzz case 4-128-2-6313103345818793189" {
@@ -53,11 +53,11 @@ test "fuzz case 4-128-2-6313103345818793189" {
     l = try CustomList(u8, 4).fromSlice(allocator, "wpwuuywcknijpuashmysojxckpleqgzjxyyqmzpmcpslwfuhmkiiicqmmzyupovmcnrticlqdwhgpvvjmjwfywokzqlmdsluhgdciylwbvpvuihvqwfixazxaialrp");
     try cmp.resize(0);
     try cmp.appendSlice("wpwuuywcknijpuashmysojxckpleqgzjxyyqmzpmcpslwfuhmkiiicqmmzyupovmcnrticlqdwhgpvvjmjwfywokzqlmdsluhgdciylwbvpvuihvqwfixazxaialrp");
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 
     l = try l.slice(101, 116);
     try cmp.appendSlice(cmp.toOwnedSlice()[101..116]);
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 }
 
 test "fuzz case 32-512-2-16721983880728474569" {
@@ -69,15 +69,15 @@ test "fuzz case 32-512-2-16721983880728474569" {
     l = try CustomList(u8, 32).fromSlice(allocator, "szhvnwlwqlnnuhfzwmlgfrkgurzkvgzvkeddllruiclgelctkrxkdwkesiziqlixizgzymqziywesgynboiebfuichbgrsbalhiusqfijxrynbbrbnhnldgiqcxhaorlumiwfnyafcbtxegkcmpjtogfrjwaieiilfwnttrxecrxjfwfsugityqermenmrhfksbhkczpuynsyxxpstucjssktpeucceirjpqkkyczjorrhjhdocjqlxxdmcedekajxvspnmebeqxrpeqxrpiwtkaiafsylmzadlpswfrfvhxxrrkcrkjvnesnttukzeptcwwzywordolcgcnugexvlpsqbzdhilkfbzmnjwpldrfgsyqruxvkiodoqjwixscchabydtkpydhkxokuoxaaypscvhhphwnktvgpzmaskcazinmdbuloxfiymzxpwvndctgcjs");
     try cmp.resize(0);
     try cmp.appendSlice("szhvnwlwqlnnuhfzwmlgfrkgurzkvgzvkeddllruiclgelctkrxkdwkesiziqlixizgzymqziywesgynboiebfuichbgrsbalhiusqfijxrynbbrbnhnldgiqcxhaorlumiwfnyafcbtxegkcmpjtogfrjwaieiilfwnttrxecrxjfwfsugityqermenmrhfksbhkczpuynsyxxpstucjssktpeucceirjpqkkyczjorrhjhdocjqlxxdmcedekajxvspnmebeqxrpeqxrpiwtkaiafsylmzadlpswfrfvhxxrrkcrkjvnesnttukzeptcwwzywordolcgcnugexvlpsqbzdhilkfbzmnjwpldrfgsyqruxvkiodoqjwixscchabydtkpydhkxokuoxaaypscvhhphwnktvgpzmaskcazinmdbuloxfiymzxpwvndctgcjs");
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 
     l = try l.insertSlice(319, "xaafnronuwliclcbhwxfdqrrqefpgpmucbekimsiifchwynisfyyeueviedskhikojgsdseksrqooxwgwsmcjrojbpvqdpfvxovrhdmsrivopiqvmwxapbxdehiusoeivfqvyzjgrtcodeaxdygawenicgtzyrsxjzpzlefjdzdzsxxywelizqsryopwwyxsubonhumksihfacgqkzvpjdfhwdglpjevsaglcpxoumehtgwzwpfdpvhstlcodbkvekbxquvawokvycunsibglvczciauvowxkqkgtxpnkaxqxyxrsjvixkceuyitabaqgcwpoawagvqqiousoangktrzaordjzjevvkteqsesmrdhyvdqqxhdhunfqwyhgnqxakenymftnquphfekqtylsdakwmxwwsyxlmnmtqzkcqcufcjiwlsroeuketqysqspcedimrkhimtsbmauzajxcoqdovee");
     try cmp.insertSlice(319, "xaafnronuwliclcbhwxfdqrrqefpgpmucbekimsiifchwynisfyyeueviedskhikojgsdseksrqooxwgwsmcjrojbpvqdpfvxovrhdmsrivopiqvmwxapbxdehiusoeivfqvyzjgrtcodeaxdygawenicgtzyrsxjzpzlefjdzdzsxxywelizqsryopwwyxsubonhumksihfacgqkzvpjdfhwdglpjevsaglcpxoumehtgwzwpfdpvhstlcodbkvekbxquvawokvycunsibglvczciauvowxkqkgtxpnkaxqxyxrsjvixkceuyitabaqgcwpoawagvqqiousoangktrzaordjzjevvkteqsesmrdhyvdqqxhdhunfqwyhgnqxakenymftnquphfekqtylsdakwmxwwsyxlmnmtqzkcqcufcjiwlsroeuketqysqspcedimrkhimtsbmauzajxcoqdovee");
-    try testList(l, cmp.toSlice());
+    try testList(l, cmp.items);
 }
 
 pub fn testList(list: var, expect: []const u8) !void {
-    const other = @typeOf(list).fromSlice(list.allocator, expect) catch unreachable;
+    const other = @TypeOf(list).fromSlice(list.allocator, expect) catch unreachable;
     var it = list.iterator(0);
     try list.foreach(0, expect, struct {
         fn t(e: []const u8, i: usize, item: u8) !void {

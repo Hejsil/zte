@@ -345,7 +345,7 @@ pub const Cursor = struct {
 pub const Text = struct {
     allocator: *mem.Allocator,
     content: Content = Content{},
-    cursors: Cursors = Cursors.fromSliceSmall([_]Cursor{Cursor{}}),
+    cursors: Cursors = Cursors.fromSliceSmall(&[_]Cursor{Cursor{}}),
     main_cursor: MainCursorIs = MainCursorIs.Last,
 
     pub const Content = core.NoAllocatorList(u8);
@@ -406,7 +406,7 @@ pub const Text = struct {
     pub fn removeAllButMainCursor(text: Text) Text {
         var res = text;
         const main = res.mainCursor();
-        res.cursors = Cursors.fromSliceSmall([_]Cursor{main});
+        res.cursors = Cursors.fromSliceSmall(&[_]Cursor{main});
 
         return res;
     }
@@ -473,14 +473,14 @@ pub const Text = struct {
     }
 
     pub fn paste(text: Text, string: []const u8) !Text {
-        var it = mem.separate(string, "\n");
+        var it = mem.split(string, "\n");
         var lines: usize = 0;
         while (it.next()) |_| : (lines += 1) {}
 
         if (text.cursors.len() != lines)
             return insert(text, string);
 
-        it = mem.separate(string, "\n");
+        it = mem.split(string, "\n");
         return text.foreachCursor(&it, struct {
             fn each(split: *mem.SplitIterator, allocator: *mem.Allocator, cc: CursorContent, i: usize) !CursorContent {
                 var res = cc;

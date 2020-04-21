@@ -15,6 +15,7 @@ const io = std.io;
 const math = std.math;
 const mem = std.mem;
 const process = std.process;
+const testing = std.testing;
 
 const Editor = core.Editor;
 const Key = input.Key;
@@ -28,22 +29,21 @@ var keys_pressed: std.ArrayList(Key.Type) = undefined;
 pub fn panic(msg: []const u8, error_return_trace: ?*builtin.StackTrace) noreturn {
     // If we panic, then we should restore the terminal settings like
     // we closed the program.
-    if (io.getStdIn()) |stdin| {
-        terminal.deinit(stdin) catch {};
-        terminal.clear(&stdin.outStream().stream) catch {};
-        stdin.write(vt100.cursor.show) catch {};
-    } else |_| {}
+    const stdin = io.getStdIn();
+    terminal.deinit(stdin) catch {};
+    terminal.clear(stdin.outStream()) catch {};
+    stdin.writeAll(vt100.cursor.show) catch {};
 
-    for (keys_pressed.toSlice()) |key|
-        debug.warn("{s}\n", ([*]const u8)(&Key.toStr(key, .NotCtrl)));
+    for (keys_pressed.items) |key|
+        debug.warn("{}\n", .{mem.span(&Key.toStr(key, .NotCtrl))});
 
     const first_trace_addr = @returnAddress();
-    std.debug.panicExtra(error_return_trace, first_trace_addr, "{}", msg);
+    std.debug.panicExtra(error_return_trace, first_trace_addr, "{}", .{msg});
 }
 
 const modified_view = draw.visible(.Hide, draw.label(.Left, "(modified) "));
 const file_name_view = draw.stack(.Horizontal, struct {
-    modified: @typeOf(modified_view) = modified_view,
+    modified: @TypeOf(modified_view) = modified_view,
     file_name: draw.Label = draw.label(.Left, ""),
 }{});
 
@@ -58,31 +58,25 @@ const info_view = draw.right(draw.value("", struct {
     pub fn format(
         self: @This(),
         comptime fmt: []const u8,
-        comptime options: std.fmt.FormatOptions,
+        options: std.fmt.FormatOptions,
         context: var,
-        comptime Errors: type,
-        output: fn (@typeOf(context), []const u8) Errors!void,
-    ) Errors!void {
-        return std.fmt.format(
-            context,
-            Errors,
-            output,
-            "{}{} ('{s}') ({},{}) (t:{B:2} a:{B:2} f:{B:2})",
-            if (self.hint.len != 0) " " else "",
+    ) !void {
+        return std.fmt.format(context, "{}{} ('{s}') ({},{}) (t:{B:2} a:{B:2} f:{B:2})", .{
+            if (self.hint.len != 0) @as([]const u8, " ") else "",
             self.hint,
-            ([*]const u8)(&Key.toStr(self.key, .NotCtrl)),
+            &Key.toStr(self.key, .NotCtrl),
             self.location.line + 1,
             self.location.column + 1,
             self.text_size,
             self.allocated_bytes,
             self.freed_bytes,
-        );
+        });
     }
 }{}));
 
 const status_bar = draw.attributes(.Negative, draw.float(struct {
-    file_name: @typeOf(file_name_view) = file_name_view,
-    info: @typeOf(info_view) = info_view,
+    file_name: @TypeOf(file_name_view) = file_name_view,
+    info: @TypeOf(info_view) = info_view,
 }{}));
 
 const goto_prompt_bar = draw.visible(.Hide, draw.attributes(.Negative, draw.customRange(draw.Range{
@@ -95,41 +89,41 @@ const goto_prompt_bar = draw.visible(.Hide, draw.attributes(.Negative, draw.cust
 
 const editor_view = draw.stack(.Vertical, struct {
     text: draw.TextView = draw.textView(true, core.Text{ .allocator = undefined }), // We init this in main
-    goto_prompt_bar: @typeOf(goto_prompt_bar) = goto_prompt_bar,
-    status_bar: @typeOf(status_bar) = status_bar,
+    goto_prompt_bar: @TypeOf(goto_prompt_bar) = goto_prompt_bar,
+    status_bar: @TypeOf(status_bar) = status_bar,
 }{});
 
 const help_popup = blk: {
     @setEvalBranchQuota(10000);
     break :blk draw.visible(.Hide, draw.center(draw.clear(draw.attributes(.Negative, draw.box(draw.label(
         .Left,
-        "'" ++ mem.toSliceConst(u8, &Key.toStr(quit_key, .NotCtrl)) ++ "': quit\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(save_key, .NotCtrl)) ++ "': save\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(undo_key, .NotCtrl)) ++ "': undo\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(copy_key, .NotCtrl)) ++ "': copy\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(paste_key, .NotCtrl)) ++ "': paste\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(select_all_key, .NotCtrl)) ++ "': select all\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(jump_key, .NotCtrl)) ++ "': jump to line\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(help_key, .CtrlAlphaNum)) ++ "': hide or show this message\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(reset_key, .NotCtrl)) ++ "': general key to cancel/reset/stop the current action\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(delete_left_key, .NotCtrl)) ++ "': delete letter to the left of cursors\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(delete_right_key, .NotCtrl)) ++ "': delete letter to the right of cursors\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_page_up_key, .NotCtrl)) ++ "': move cursors up one screen\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_page_down_key, .NotCtrl)) ++ "': move cursors down one screen\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_start_key, .NotCtrl)) ++ "': move cursors to start of file\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_end_key, .NotCtrl)) ++ "': move cursors to end of file\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_up_key, .NotCtrl)) ++ "': move cursors up\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_down_key, .NotCtrl)) ++ "': move cursors down\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_left_key, .NotCtrl)) ++ "': move cursors left\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_right_key, .NotCtrl)) ++ "': move cursors right\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_select_up_key, .NotCtrl)) ++ "': move selections up\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_select_down_key, .NotCtrl)) ++ "': move selections down\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_select_left_key, .NotCtrl)) ++ "': move selections left\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(move_select_right_key, .NotCtrl)) ++ "': move selections right\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(spawn_cursor_up_key, .NotCtrl)) ++ "': spawn a cursor above the main cursor\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(spawn_cursor_down_key, .NotCtrl)) ++ "': spawn a cursor below the main cursor\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(spawn_cursor_left_key, .NotCtrl)) ++ "': spawn a cursor to the left of the main cursor\n" ++
-            "'" ++ mem.toSliceConst(u8, &Key.toStr(spawn_cursor_right_key, .NotCtrl)) ++ "': spawn a cursor to the right of the main cursor",
+        "'" ++ mem.span(&Key.toStr(quit_key, .NotCtrl)) ++ "': quit\n" ++
+            "'" ++ mem.span(&Key.toStr(save_key, .NotCtrl)) ++ "': save\n" ++
+            "'" ++ mem.span(&Key.toStr(undo_key, .NotCtrl)) ++ "': undo\n" ++
+            "'" ++ mem.span(&Key.toStr(copy_key, .NotCtrl)) ++ "': copy\n" ++
+            "'" ++ mem.span(&Key.toStr(paste_key, .NotCtrl)) ++ "': paste\n" ++
+            "'" ++ mem.span(&Key.toStr(select_all_key, .NotCtrl)) ++ "': select all\n" ++
+            "'" ++ mem.span(&Key.toStr(jump_key, .NotCtrl)) ++ "': jump to line\n" ++
+            "'" ++ mem.span(&Key.toStr(help_key, .CtrlAlphaNum)) ++ "': hide or show this message\n" ++
+            "'" ++ mem.span(&Key.toStr(reset_key, .NotCtrl)) ++ "': general key to cancel/reset/stop the current action\n" ++
+            "'" ++ mem.span(&Key.toStr(delete_left_key, .NotCtrl)) ++ "': delete letter to the left of cursors\n" ++
+            "'" ++ mem.span(&Key.toStr(delete_right_key, .NotCtrl)) ++ "': delete letter to the right of cursors\n" ++
+            "'" ++ mem.span(&Key.toStr(move_page_up_key, .NotCtrl)) ++ "': move cursors up one screen\n" ++
+            "'" ++ mem.span(&Key.toStr(move_page_down_key, .NotCtrl)) ++ "': move cursors down one screen\n" ++
+            "'" ++ mem.span(&Key.toStr(move_start_key, .NotCtrl)) ++ "': move cursors to start of file\n" ++
+            "'" ++ mem.span(&Key.toStr(move_end_key, .NotCtrl)) ++ "': move cursors to end of file\n" ++
+            "'" ++ mem.span(&Key.toStr(move_up_key, .NotCtrl)) ++ "': move cursors up\n" ++
+            "'" ++ mem.span(&Key.toStr(move_down_key, .NotCtrl)) ++ "': move cursors down\n" ++
+            "'" ++ mem.span(&Key.toStr(move_left_key, .NotCtrl)) ++ "': move cursors left\n" ++
+            "'" ++ mem.span(&Key.toStr(move_right_key, .NotCtrl)) ++ "': move cursors right\n" ++
+            "'" ++ mem.span(&Key.toStr(move_select_up_key, .NotCtrl)) ++ "': move selections up\n" ++
+            "'" ++ mem.span(&Key.toStr(move_select_down_key, .NotCtrl)) ++ "': move selections down\n" ++
+            "'" ++ mem.span(&Key.toStr(move_select_left_key, .NotCtrl)) ++ "': move selections left\n" ++
+            "'" ++ mem.span(&Key.toStr(move_select_right_key, .NotCtrl)) ++ "': move selections right\n" ++
+            "'" ++ mem.span(&Key.toStr(spawn_cursor_up_key, .NotCtrl)) ++ "': spawn a cursor above the main cursor\n" ++
+            "'" ++ mem.span(&Key.toStr(spawn_cursor_down_key, .NotCtrl)) ++ "': spawn a cursor below the main cursor\n" ++
+            "'" ++ mem.span(&Key.toStr(spawn_cursor_left_key, .NotCtrl)) ++ "': spawn a cursor to the left of the main cursor\n" ++
+            "'" ++ mem.span(&Key.toStr(spawn_cursor_right_key, .NotCtrl)) ++ "': spawn a cursor to the right of the main cursor",
     ))))));
 };
 
@@ -139,25 +133,25 @@ const quit_popup = blk: {
         .Center,
         "Warning!\n" ++
             "You have unsaved changes.\n" ++
-            "Press '" ++ mem.toSliceConst(u8, &Key.toStr(quit_key, .NotCtrl)) ++ "' to forcefully quit",
+            "Press '" ++ mem.span(&Key.toStr(quit_key, .NotCtrl)) ++ "' to forcefully quit",
     ))))));
 };
 
 const window_view = draw.float(struct {
-    editor: @typeOf(editor_view) = editor_view,
-    help_popup: @typeOf(help_popup) = help_popup,
-    quit_popup: @typeOf(quit_popup) = quit_popup,
+    editor: @TypeOf(editor_view) = editor_view,
+    help_popup: @TypeOf(help_popup) = help_popup,
+    quit_popup: @TypeOf(quit_popup) = quit_popup,
 }{});
 
 pub fn main() !void {
-    var failing = debug.FailingAllocator.init(heap.direct_allocator, math.maxInt(usize));
+    var failing = testing.FailingAllocator.init(heap.page_allocator, math.maxInt(usize));
     var arena = heap.ArenaAllocator.init(&failing.allocator);
     const allocator = &arena.allocator;
 
-    const stdin = try io.getStdIn();
-    const stdout = try io.getStdOut();
-    const stdout_stream = &stdout.outStream().stream;
-    var stdout_buf = io.BufferedOutStreamCustom(std.mem.page_size * 40, fs.File.WriteError).init(stdout_stream);
+    const stdin = io.getStdIn();
+    const stdout = io.getStdOut();
+    const stdout_stream = stdout.outStream();
+    var stdout_buf = io.bufferedOutStream(stdout_stream);
 
     const args = try process.argsAlloc(allocator);
     defer allocator.free(args);
@@ -198,8 +192,8 @@ pub fn main() !void {
             .height = size.rows,
         });
         term.draw(&app.view);
-        try terminal.clear(&stdout_buf.stream);
-        try term.output(&stdout_buf.stream);
+        try terminal.clear(stdout_buf.outStream());
+        try term.output(stdout_buf.outStream());
         try stdout_buf.flush();
 
         const key = try input.readKey(stdin);
@@ -208,14 +202,14 @@ pub fn main() !void {
         app = (try handleInput(app, key)) orelse break;
     }
 
-    try terminal.clear(&stdout_buf.stream);
-    try stdout_buf.stream.write(vt100.cursor.show);
+    try terminal.clear(stdout_buf.outStream());
+    try stdout_buf.outStream().writeAll(vt100.cursor.show);
     try stdout_buf.flush();
 }
 
 const App = struct {
     editor: core.Editor,
-    view: @typeOf(window_view),
+    view: @TypeOf(window_view),
 };
 
 const reset_key = Key.escape;
@@ -251,7 +245,7 @@ const spawn_cursor_down_key = Key.ctrl_arrow_down;
 const spawn_cursor_left_key = Key.ctrl_arrow_left;
 const spawn_cursor_right_key = Key.ctrl_arrow_right;
 
-const default_hint = "'" ++ mem.toSliceConst(u8, &Key.toStr(help_key, .CtrlAlphaNum)) ++ "' for help";
+const default_hint = "'" ++ mem.span(&Key.toStr(help_key, .CtrlAlphaNum)) ++ "' for help";
 
 fn handleInput(app: App, key: Key.Type) !?App {
     var editor = app.editor;
@@ -286,7 +280,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
 
             else => {
                 if (ascii.isDigit(math.cast(u8, key) catch 0))
-                    prompt_text.* = try prompt_text.insert([_]u8{@intCast(u8, key)});
+                    prompt_text.* = try prompt_text.insert(&[_]u8{@intCast(u8, key)});
             },
         }
 
@@ -301,7 +295,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
             var cursor = text.mainCursor();
             cursor.index = cursor.index.moveToLine(math.sub(usize, line, 1) catch 0, text.content);
             cursor.selection = cursor.index;
-            text.cursors = core.Text.Cursors.fromSliceSmall([_]core.Cursor{cursor});
+            text.cursors = core.Text.Cursors.fromSliceSmall(&[_]core.Cursor{cursor});
         }
 
         // Add new undo point.
@@ -389,7 +383,7 @@ fn handleInput(app: App, key: Key.Type) !?App {
         // Every other key is inserted if they are printable ascii
         else => {
             if (ascii.isPrint(math.cast(u8, key) catch 0))
-                text = try text.insert([_]u8{@intCast(u8, key)});
+                text = try text.insert(&[_]u8{@intCast(u8, key)});
         },
     }
 

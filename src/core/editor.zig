@@ -35,7 +35,7 @@ pub const Editor = struct {
     }
 
     pub fn fromFile(allocator: *mem.Allocator, path: []const u8) !Editor {
-        const file = fs.File.openRead(path) catch |err| switch (err) {
+        const file = fs.cwd().openFile(path, .{}) catch |err| switch (err) {
             error.FileNotFound => {
                 var res = try fromString(allocator, "");
                 res.file = File{
@@ -70,14 +70,15 @@ pub const Editor = struct {
             return editor;
 
         const editor_file = editor.file orelse return error.NoFile;
-        const file = try fs.File.openWrite(editor_file.path);
+        const file = try fs.cwd().openFile(editor_file.path, .{ .write = true });
         defer file.close();
 
         const curr = editor.current();
-        const out_stream = &file.outStream().stream;
-        var buf_out_stream = io.BufferedOutStream(fs.File.WriteError).init(out_stream);
-        try curr.content.foreach(0, &buf_out_stream.stream, struct {
-            fn each(stream: *io.OutStream(fs.File.WriteError), i: usize, item: u8) !void {
+        const out_stream = file.outStream();
+        var buf_out_stream = io.bufferedOutStream(out_stream);
+        const Stream = @TypeOf(buf_out_stream.outStream());
+        try curr.content.foreach(0, buf_out_stream.outStream(), struct {
+            fn each(stream: Stream, i: usize, item: u8) !void {
                 try stream.writeByte(item);
             }
         }.each);
@@ -142,10 +143,10 @@ pub const Editor = struct {
         errdefer _ = proc.kill() catch undefined;
 
         var file_out = proc.stdin.?.outStream();
-        var buf_out = io.BufferedOutStream(fs.File.OutStream.Error).init(&file_out.stream);
-        const Stream = io.OutStream(fs.File.OutStream.Error);
+        var buf_out = io.bufferedOutStream(file_out);
+        const Stream = @TypeOf(buf_out.outStream());
         const Context = struct {
-            stream: *Stream,
+            stream: Stream,
             text: core.Text,
             end: usize = 0,
         };
@@ -153,13 +154,13 @@ pub const Editor = struct {
         try text.cursors.foreach(
             0,
             Context{
-                .stream = &buf_out.stream,
+                .stream = buf_out.outStream(),
                 .text = text,
             },
             struct {
                 fn each(c: Context, i: usize, cursor: core.Cursor) !void {
                     if (i != 0)
-                        try c.stream.write("\n");
+                        try c.stream.writeAll("\n");
 
                     var new_c = c;
                     new_c.end = cursor.end().index;
@@ -171,7 +172,7 @@ pub const Editor = struct {
                                 if (j == context.end)
                                     return error.Break;
 
-                                try context.stream.write([_]u8{char});
+                                try context.stream.writeAll(&[_]u8{char});
                             }
                         }.each2,
                     ) catch |err| switch (err) {
@@ -196,7 +197,7 @@ pub const Editor = struct {
         errdefer _ = proc.kill() catch undefined;
 
         var file_out = proc.stdout.?.inStream();
-        const str = try file_out.stream.readAllAlloc(allocator, 1024 * 1024 * 512);
+        const str = try file_out.readAllAlloc(allocator, 1024 * 1024 * 512);
         switch (try proc.wait()) {
             .Exited => |status| {
                 if (status != 0)

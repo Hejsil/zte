@@ -47,7 +47,7 @@ pub fn CustomList(comptime T: type, comptime leaf_size: comptime_int) type {
             return list.list.blockIterator(start);
         }
 
-        pub fn foreach(list: @This(), start: usize, context: var, func: var) @typeOf(func).ReturnType {
+        pub fn foreach(list: @This(), start: usize, context: var, func: var) @TypeOf(func).ReturnType {
             return list.list.foreach(start, context, func);
         }
 
@@ -127,14 +127,14 @@ pub fn CustomList(comptime T: type, comptime leaf_size: comptime_int) type {
         }
 
         pub fn toSlice(list: @This(), allocator: *mem.Allocator) ![]T {
-            return list.list.toSlice(list.allocator);
+            return list.list.items(list.allocator);
         }
 
         pub fn equal(a: @This(), b: @This()) bool {
             return L.equal(a.list, b.list);
         }
 
-        pub fn dump(list: @This(), stream: var) @typeOf(stream.writeFn).ReturnType {
+        pub fn dump(list: @This(), stream: var) @TypeOf(stream.writeFn).ReturnType {
             return list.list.dump(stream);
         }
     };
@@ -276,11 +276,11 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
 
         /// Iterate over all items in the list, calling 'func' with each item in order.
         /// O(length * O(func))
-        pub fn foreach(list: @This(), start: usize, context: var, func: var) @typeOf(func).ReturnType {
+        pub fn foreach(list: @This(), start: usize, context: var, func: var) @TypeOf(func).ReturnType {
             try list.foreachHelper(start, 0, context, func);
         }
 
-        fn foreachHelper(list: @This(), start: usize, offset: usize, context: var, func: var) @typeOf(func).ReturnType {
+        fn foreachHelper(list: @This(), start: usize, offset: usize, context: var, func: var) @TypeOf(func).ReturnType {
             if (list.depth == 0) {
                 for (list.data.leaf.items[start..list.length]) |item, i|
                     try func(context, start + i + offset, item);
@@ -303,11 +303,11 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
 
         /// Iterate over all items in the list, calling 'func' with each item in order.
         /// O(length * O(func))
-        pub fn foreachBlock(list: @This(), start: usize, context: var, func: var) @typeOf(func).ReturnType {
+        pub fn foreachBlock(list: @This(), start: usize, context: var, func: var) @TypeOf(func).ReturnType {
             try list.foreachHelper(start, 0, context, func);
         }
 
-        fn foreachBlockHelper(list: @This(), start: usize, offset: usize, context: var, func: var) @typeOf(func).ReturnType {
+        fn foreachBlockHelper(list: @This(), start: usize, offset: usize, context: var, func: var) @TypeOf(func).ReturnType {
             if (list.depth == 0) {
                 try func(context, start + i + offset, ist.data.leaf.items[start..list.length]);
             } else {
@@ -367,7 +367,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
         ///          mutate those lists as well. The best way to ensure this is safe,
         ///          is to call 'mut' before using this method.
         pub fn appendMut(list: *@This(), allocator: *mem.Allocator, item: T) !void {
-            return list.appendSliceMut(allocator, [_]T{item});
+            return list.appendSliceMut(allocator, &[_]T{item});
         }
 
         /// Returns a new list which has 'items' appended to the end.
@@ -592,7 +592,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
         /// Returns list that has 'item' inserted a 'i'
         /// O(depth) TODO: More accurate
         pub fn insert(list: @This(), allocator: *mem.Allocator, i: usize, item: T) !@This() {
-            return list.insertSlice(allocator, i, [_]T{item});
+            return list.insertSlice(allocator, i, &[_]T{item});
         }
 
         /// Returns list that has 'item' inserted a 'i'
@@ -832,19 +832,19 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
             return true;
         }
 
-        pub fn dump(list: @This(), stream: var) @typeOf(stream.writeFn).ReturnType {
+        pub fn dump(list: @This(), stream: var) @TypeOf(stream.writeFn).ReturnType {
             if (list.depth == 0) {
                 const max_items = 6;
                 for (list.data.leaf.items[0..math.min(list.length, max_items)]) |item, i| {
                     if (i != 0)
-                        try stream.write("|");
+                        try stream.writeAll("|");
                     try stream.print("{}", item);
                 }
                 if (max_items < list.length)
                     try stream.print("|...");
                 try stream.print(" length: {}", list.length);
             } else {
-                var lps = try LinePrependStream(@typeOf(stream.writeFn).ReturnType.ErrorSet).init("|", stream);
+                var lps = try LinePrependStream(@TypeOf(stream.writeFn).ReturnType.ErrorSet).init("|", stream);
                 try lps.stream.print("-- length: {} depth: {}", list.length, list.depth);
                 for (list.nodeChildren()) |child, i| {
                     try lps.stream.write("\n");
@@ -921,7 +921,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
             return list.lastNodePtr().*;
         }
 
-        fn lastNodePtr(list: var) @typeOf(&list.data.node.children[0]) {
+        fn lastNodePtr(list: var) @TypeOf(&list.data.node.children[0]) {
             debug.assert(list.depth != 0);
             return &list.data.node.children[list.data.node.length - 1];
         }
@@ -930,7 +930,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
             return list.firstNodePtr().*;
         }
 
-        fn firstNodePtr(list: var) @typeOf(&list.data.node.children[0]) {
+        fn firstNodePtr(list: var) @TypeOf(&list.data.node.children[0]) {
             debug.assert(list.depth != 0);
             return &list.data.node.children[0];
         }
@@ -955,7 +955,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
         fn makeDeep(list: @This(), allocator: *mem.Allocator, depth: usize) !@This() {
             var res = list;
             while (res.depth < depth)
-                res = try fromChildren(allocator, (*[1]@This())(try res.dupe(allocator)));
+                res = try fromChildren(allocator, @as(*[1]@This(), try res.dupe(allocator)));
 
             return res;
         }
@@ -1042,7 +1042,7 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
 
         pub const Iterator = struct {
             inner: BlockIterator,
-            curr: []const T = [_]T{},
+            curr: []const T = &[_]T{},
             curr_i: usize = 0,
 
             fn init(list: *const L, start: usize) Iterator {
@@ -1064,16 +1064,16 @@ pub fn NoAllocatorCustomList(comptime T: type, comptime leaf_size: comptime_int)
     };
 }
 
-fn divCeil(a: var, b: var) @typeOf(a / b) {
+fn divCeil(a: var, b: var) @TypeOf(a / b) {
     return (a + (b - 1)) / b;
 }
 
 test "divCeil" {
-    testing.expectEqual(u64(0), divCeil(0, 5));
-    testing.expectEqual(u64(1), divCeil(1, 5));
-    testing.expectEqual(u64(1), divCeil(5, 5));
-    testing.expectEqual(u64(2), divCeil(6, 5));
-    testing.expectEqual(u64(2), divCeil(10, 5));
-    testing.expectEqual(u64(3), divCeil(11, 5));
-    testing.expectEqual(u64(3), divCeil(15, 5));
+    testing.expectEqual(@as(u64, 0), divCeil(0, 5));
+    testing.expectEqual(@as(u64, 1), divCeil(1, 5));
+    testing.expectEqual(@as(u64, 1), divCeil(5, 5));
+    testing.expectEqual(@as(u64, 2), divCeil(6, 5));
+    testing.expectEqual(@as(u64, 2), divCeil(10, 5));
+    testing.expectEqual(@as(u64, 3), divCeil(11, 5));
+    testing.expectEqual(@as(u64, 3), divCeil(15, 5));
 }
