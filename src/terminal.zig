@@ -98,15 +98,10 @@ fn enableRawMode(file: fs.File) !void {
 }
 
 fn getAttr(file: fs.File) !os.termios {
-    //    var raw: os.termios = undefined;
-    //    if (os.tcgetattr(file.handle, &raw) == -1)
-    //        return error.TermiosError;
     return try os.tcgetattr(file.handle);
 }
 
 fn setAttr(file: fs.File, attr: os.termios) !void {
-    //    if (os.tcsetattr(file.handle, os.TCSA.FLUSH, &attr) == -1)
-    //        return error.TermiosError;
     try os.tcsetattr(file.handle, os.TCSA.FLUSH, attr);
 }
 
