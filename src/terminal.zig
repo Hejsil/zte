@@ -1,12 +1,12 @@
 const std = @import("std");
 
 const c = @import("c.zig");
-const os = std.os;
 const vt100 = @import("vt100.zig");
 
 const fmt = std.fmt;
 const fs = std.fs;
 const mem = std.mem;
+const os = std.os;
 
 var old_tc_attr: ?os.termios = null;
 
@@ -92,8 +92,8 @@ fn enableRawMode(file: fs.File) !void {
     raw.oflag &= ~@as(@TypeOf(raw.lflag), os.OPOST);
     raw.cflag &= ~@as(@TypeOf(raw.lflag), os.CS8);
     raw.lflag &= ~@as(@TypeOf(raw.lflag), os.ECHO | os.ICANON | os.IEXTEN | os.ISIG);
-    raw.cc[5] = 0;
-    raw.cc[7] = 1;
+    raw.cc[VMIN] = 0;
+    raw.cc[VTIME] = 1;
     try os.tcsetattr(file.handle, os.TCSA.FLUSH, raw);
 }
 
