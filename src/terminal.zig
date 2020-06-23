@@ -15,13 +15,13 @@ pub fn clear(stream: var) !void {
 }
 
 pub fn init(stdin: fs.File) !void {
-    old_tc_attr = try getAttr(stdin);
+    old_tc_attr = try os.tcgetattr(stdin.handle);
     try enableRawMode(stdin);
 }
 
 pub fn deinit(stdin: fs.File) !void {
     if (old_tc_attr) |old|
-        try setAttr(stdin, old);
+        try os.tcsetattr(stdin.handle, os.TCSA.FLUSH, old);
 }
 
 pub const Size = struct {
@@ -87,22 +87,14 @@ pub fn cursorPosition(stdout: fs.File, stdin: fs.File) !Pos {
 }
 
 fn enableRawMode(file: fs.File) !void {
-    var raw = try getAttr(file);
+    var raw = try os.tcgetattr(file.handle);
     raw.iflag &= ~@as(@TypeOf(raw.lflag), BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.oflag &= ~@as(@TypeOf(raw.lflag), os.OPOST);
     raw.cflag &= ~@as(@TypeOf(raw.lflag), os.CS8);
     raw.lflag &= ~@as(@TypeOf(raw.lflag), os.ECHO | os.ICANON | os.IEXTEN | os.ISIG);
     raw.cc[5] = 0;
     raw.cc[7] = 1;
-    try setAttr(file, raw);
-}
-
-fn getAttr(file: fs.File) !os.termios {
-    return try os.tcgetattr(file.handle);
-}
-
-fn setAttr(file: fs.File, attr: os.termios) !void {
-    try os.tcsetattr(file.handle, os.TCSA.FLUSH, attr);
+    try os.tcsetattr(file.handle, os.TCSA.FLUSH, raw);
 }
 
 const builtin = @import("builtin");
