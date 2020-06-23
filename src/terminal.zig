@@ -6,21 +6,22 @@ const vt100 = @import("vt100.zig");
 const fmt = std.fmt;
 const fs = std.fs;
 const mem = std.mem;
+const os = std.os;
 
-var old_tc_attr: ?c.termios = null;
+var old_tc_attr: ?os.termios = null;
 
 pub fn clear(stream: var) !void {
     try stream.writeAll(vt100.erase.inDisplay(vt100.erase.all) ++ vt100.cursor.position(""));
 }
 
 pub fn init(stdin: fs.File) !void {
-    old_tc_attr = try getAttr(stdin);
+    old_tc_attr = try os.tcgetattr(stdin.handle);
     try enableRawMode(stdin);
 }
 
 pub fn deinit(stdin: fs.File) !void {
     if (old_tc_attr) |old|
-        try setAttr(stdin, old);
+        try os.tcsetattr(stdin.handle, os.TCSA.FLUSH, old);
 }
 
 pub const Size = struct {
@@ -86,27 +87,14 @@ pub fn cursorPosition(stdout: fs.File, stdin: fs.File) !Pos {
 }
 
 fn enableRawMode(file: fs.File) !void {
-    var raw = try getAttr(file);
-    raw.c_iflag &= ~@as(@TypeOf(raw.c_lflag), BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    raw.c_oflag &= ~@as(@TypeOf(raw.c_lflag), c.OPOST);
-    raw.c_cflag &= ~@as(@TypeOf(raw.c_lflag), c.CS8);
-    raw.c_lflag &= ~@as(@TypeOf(raw.c_lflag), c.ECHO | c.ICANON | c.IEXTEN | c.ISIG);
-    raw.c_cc[c.VMIN] = 0;
-    raw.c_cc[c.VTIME] = 1;
-    try setAttr(file, raw);
-}
-
-fn getAttr(file: fs.File) !c.termios {
-    var raw: c.termios = undefined;
-    if (c.tcgetattr(file.handle, &raw) == -1)
-        return error.TermiosError;
-
-    return raw;
-}
-
-fn setAttr(file: fs.File, attr: c.termios) !void {
-    if (c.tcsetattr(file.handle, c.TCSAFLUSH, &attr) == -1)
-        return error.TermiosError;
+    var raw = try os.tcgetattr(file.handle);
+    raw.iflag &= ~@as(@TypeOf(raw.lflag), BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.oflag &= ~@as(@TypeOf(raw.lflag), os.OPOST);
+    raw.cflag &= ~@as(@TypeOf(raw.lflag), os.CS8);
+    raw.lflag &= ~@as(@TypeOf(raw.lflag), os.ECHO | os.ICANON | os.IEXTEN | os.ISIG);
+    raw.cc[VMIN] = 0;
+    raw.cc[VTIME] = 1;
+    try os.tcsetattr(file.handle, os.TCSA.FLUSH, raw);
 }
 
 const builtin = @import("builtin");
@@ -125,14 +113,14 @@ const IXON = 0o2000;
 
 const Termios = switch (builtin.arch) {
     .x86_64 => extern struct {
-        c_iflag: tcflag_t,
-        c_oflag: tcflag_t,
-        c_cflag: tcflag_t,
-        c_lflag: tcflag_t,
-        c_line: cc_t,
-        c_cc: [NCCS]cc_t,
-        __c_ispeed: speed_t,
-        __c_ospeed: speed_t,
+        iflag: tcflag_t,
+        oflag: tcflag_t,
+        cflag: tcflag_t,
+        lflag: tcflag_t,
+        line: cc_t,
+        cc: [NCCS]cc_t,
+        ispeed: speed_t,
+        ospeed: speed_t,
     },
     else => @compileError("Unsupported arch"),
 };

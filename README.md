@@ -20,7 +20,7 @@ Things I remember about this editor:
     not be this simple though.
   * There is also a terminal backend for this *framework*
 * It nearly has no dependencies, only relying on glibc for
-  [2 functions](https://github.com/Hejsil/zte/blob/master/src/c.zig).
+  [1 function](https://github.com/Hejsil/zte/blob/master/src/c.zig).
 
 ![demo](demo.gif)
 
