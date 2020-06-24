@@ -7,12 +7,12 @@ zig, but I do not really indend to work much more on this.
 Things I remember about this editor:
 * I was playing around with immutable data structures, so the entire editor
   is based around this concept (See the immutable list implementation
-  [here](https://github.com/Hejsil/zte/blob/master/src/core/list.zig)).
+  [here](src/core/list.zig)).
   * This editor currently just leaks all its memory. The idea was to
     implement some manual garbage collector where the implementer would
     have to tag memory as alive themself and then they could run it
     to clean up the rest.
-* There is also a terminal [UI *framework*](https://github.com/Hejsil/zte/blob/master/src/draw.zig)
+* There is also a terminal [UI *framework*](src/draw.zig)
   in there that allows programmers
   to statically declare the layout of the UI at compile time.
   * In theory, the layout is completly seperated from the drawing
@@ -20,7 +20,7 @@ Things I remember about this editor:
     not be this simple though.
   * There is also a terminal backend for this *framework*
 * It nearly has no dependencies, only relying on glibc for
-  [1 function](https://github.com/Hejsil/zte/blob/master/src/c.zig).
+  [1 function](src/c.zig).
 
 ![demo](demo.gif)
 
