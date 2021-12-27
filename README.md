@@ -1,8 +1,6 @@
 # zte
 
-A terminal text editor written in Zig.
-I'll try to keep this project building with the latest version of
-zig, but I do not really indend to work much more on this.
+A terminal text editor written in Zig (not maintained).
 
 Things I remember about this editor:
 * I was playing around with immutable data structures, so the entire editor
